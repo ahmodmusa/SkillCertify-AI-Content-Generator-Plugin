@@ -52,6 +52,11 @@ All notable changes to the SC AI Content Generator plugin will be documented in 
 - Updated README.md with latest changes
 - Updated plugin version to 1.0.1
 
+### Bug Fixes
+- Fixed JavaScript syntax error in settings.php preventing button functionality
+- Wrapped all event listeners in DOMContentLoaded for proper DOM attachment
+- Added null checks for all button event listeners
+
 ## [1.0.0] - Initial Release
 - Initial release of SC AI Content Generator plugin
 - Dual content pipeline (draft + final)

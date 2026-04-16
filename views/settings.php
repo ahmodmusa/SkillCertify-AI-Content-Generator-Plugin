@@ -221,180 +221,118 @@ if (typeof ajaxurl === 'undefined') {
     ajaxurl = '<?= admin_url( 'admin-ajax.php' ) ?>';
 }
 
-// Draft batch handler
-document.getElementById('sc-run-draft-batch').addEventListener('click', () => {
-    const batch = parseInt(document.getElementById('sc-dual-batch').value) || 5;
-    const result = document.getElementById('sc-dual-result');
-    result.style.display = 'block';
-    result.style.background = '#FFF3CD';
-    result.innerHTML = `<strong>Generating draft for ${batch} question(s)...</strong>`;
-
-    fetch(ajaxurl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            action: 'sc_ai_draft_batch_manual',
-            nonce: '<?= wp_create_nonce( 'sc_ai_nonce' ) ?>',
-            batch: batch,
-        }),
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            result.style.background = '#D4EDDA';
-            result.innerHTML = `<strong>Draft Batch Complete!</strong> Generated ${data.data.success} drafts.`;
-            setTimeout(() => location.reload(), 2000);
-        } else {
-            result.style.background = '#F8D7DA';
-            result.innerHTML = `<strong>Error:</strong> ${data.data.message || data.data || 'Unknown error'}`;
-        }
-    })
-    .catch(err => {
-        result.style.background = '#F8D7DA';
-        result.innerHTML = `<strong>Error:</strong> ${err.message || err || 'Unknown error'}`;
-    });
-});
-
-// Final batch handler
-document.getElementById('sc-run-final-batch').addEventListener('click', () => {
-    const batch = parseInt(document.getElementById('sc-dual-batch').value) || 5;
-    const result = document.getElementById('sc-dual-result');
-    result.style.display = 'block';
-    result.style.background = '#FFF3CD';
-    result.innerHTML = `<strong>Generating final for ${batch} question(s)...</strong>`;
-
-    fetch(ajaxurl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            action: 'sc_ai_final_batch_manual',
-            nonce: '<?= wp_create_nonce( 'sc_ai_nonce' ) ?>',
-            batch: batch,
-        }),
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            result.style.background = '#D4EDDA';
-            result.innerHTML = `<strong>Final Batch Complete!</strong> Generated ${data.data.success} final contents.`;
-            setTimeout(() => location.reload(), 2000);
-        } else {
-            result.style.background = '#F8D7DA';
-            result.innerHTML = `<strong>Error:</strong> ${data.data.message || data.data || 'Unknown error'}`;
-        }
-    })
-    .catch(err => {
-        result.style.background = '#F8D7DA';
-        result.innerHTML = `<strong>Error:</strong> ${err.message || err || 'Unknown error'}`;
-    });
-});
-
-// Test API connection
-document.getElementById('sc-test-api').addEventListener('click', () => {
-    const result = document.getElementById('sc-api-test-result');
-    result.style.display = 'block';
-    result.style.background = '#FFF3CD';
-    result.innerHTML = '<strong>Testing API connection...</strong>';
-
-    fetch(ajaxurl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            action: 'sc_ai_test_api',
-            nonce: '<?= wp_create_nonce( 'sc_ai_nonce' ); ?>',
-        }),
-    })
-    .then( response => {
-        if (!response.ok) {
-            throw new Error('HTTP ' + response.status + ': ' + response.statusText);
-        }
-        return response.json();
-    })
-    .then( data => {
-        if ( data.success ) {
-            const r = data.data;
-            let html = '<strong>API Test Results:</strong><br><br>';
-
-            if ( r.groq ) {
-                if ( r.groq.status === 'success' ) {
-                    html += '✅ <strong>Groq:</strong> Connected<br>';
-                } else if ( r.groq.status === 'not_configured' ) {
-                    html += '⚠ <strong>Groq:</strong> Not configured<br>';
-                } else if ( r.groq.status === 'rate_limited' ) {
-                    html += '⏳ <strong>Groq:</strong> Rate limited - ' + r.groq.error + '<br>';
-                } else {
-                    html += '❌ <strong>Groq:</strong> Failed - ' + r.groq.error + '<br>';
-                }
-            }
-
-            if ( r.openrouter ) {
-                if ( r.openrouter.status === 'success' ) {
-                    html += '✅ <strong>OpenRouter:</strong> Connected';
-                } else if ( r.openrouter.status === 'not_configured' ) {
-                    html += '⚠ <strong>OpenRouter:</strong> Not configured';
-                } else if ( r.openrouter.status === 'rate_limited' ) {
-                    html += '⏳ <strong>OpenRouter:</strong> Rate limited - ' + r.openrouter.error;
-                } else {
-                    html += '❌ <strong>OpenRouter:</strong> Failed - ' + r.openrouter.error;
-                }
-            }
-
-            result.style.background = '#D4EDDA';
-            result.innerHTML = html;
-        } else {
-            result.style.background = '#F8D7DA';
-            result.innerHTML = '<strong>Error:</strong> ' + data.data;
-        }
-    })
-    .catch( err => {
-        result.style.background = '#F8D7DA';
-        result.innerHTML = '<strong>Error:</strong> ' + err.message + '<br><small>Check browser console for details (F12)</small>';
-    });
-});
-
-// Reset stuck questions
-document.getElementById('sc-reset-stuck').addEventListener('click', () => {
-    const result = document.getElementById('sc-api-test-result');
-    result.style.display = 'block';
-    result.style.background = '#FFF3CD';
-    result.innerHTML = '<strong>Resetting stuck questions...</strong>';
-
-    fetch(ajaxurl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-            action: 'sc_ai_reset_stuck',
-            nonce: '<?= wp_create_nonce( 'sc_ai_nonce' ); ?>',
-        }),
-    })
-    .then( r => r.json() )
-    .then( data => {
-        if ( data.success ) {
-            result.style.background = '#D4EDDA';
-            let msg = '<strong>Reset Complete!</strong><br>';
-            if ( data.data.locks_cleared ) {
-                msg += '✅ Cleared batch locks<br>';
-            }
-            if ( data.data.reset_count > 0 ) {
-                msg += '✅ Reset ' + data.data.reset_count + ' stuck questions to pending.';
-            } else {
-                msg += 'No stuck questions found.';
-            }
-            result.innerHTML = msg;
-            setTimeout(() => location.reload(), 1000);
-        } else {
-            result.style.background = '#F8D7DA';
-            result.innerHTML = '<strong>Error:</strong> ' + data.data;
-        }
-    })
-    .catch( err => {
-        result.style.background = '#F8D7DA';
-        result.innerHTML = '<strong>Error:</strong> ' + err.message;
-    });
-});
-
-// Manual cron trigger
 document.addEventListener('DOMContentLoaded', function() {
+    // Test API connection
+    const testApiBtn = document.getElementById('sc-test-api');
+    if (testApiBtn) {
+        testApiBtn.addEventListener('click', function() {
+            const result = document.getElementById('sc-api-test-result');
+            result.style.display = 'block';
+            result.style.background = '#FFF3CD';
+            result.innerHTML = '<strong>Testing API connection...</strong>';
+
+            fetch(ajaxurl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    action: 'sc_ai_test_api',
+                    nonce: '<?= wp_create_nonce( 'sc_ai_nonce' ); ?>',
+                }),
+            })
+            .then( response => {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status + ': ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then( data => {
+                if ( data.success ) {
+                    const r = data.data;
+                    let html = '<strong>API Test Results:</strong><br><br>';
+
+                    if ( r.groq ) {
+                        if ( r.groq.status === 'success' ) {
+                            html += '✅ <strong>Groq:</strong> Connected<br>';
+                        } else if ( r.groq.status === 'not_configured' ) {
+                            html += '⚠ <strong>Groq:</strong> Not configured<br>';
+                        } else if ( r.groq.status === 'rate_limited' ) {
+                            html += '⏳ <strong>Groq:</strong> Rate limited - ' + r.groq.error + '<br>';
+                        } else {
+                            html += '❌ <strong>Groq:</strong> Failed - ' + r.groq.error + '<br>';
+                        }
+                    }
+
+                    if ( r.openrouter ) {
+                        if ( r.openrouter.status === 'success' ) {
+                            html += '✅ <strong>OpenRouter:</strong> Connected';
+                        } else if ( r.openrouter.status === 'not_configured' ) {
+                            html += '⚠ <strong>OpenRouter:</strong> Not configured';
+                        } else if ( r.openrouter.status === 'rate_limited' ) {
+                            html += '⏳ <strong>OpenRouter:</strong> Rate limited - ' + r.openrouter.error;
+                        } else {
+                            html += '❌ <strong>OpenRouter:</strong> Failed - ' + r.openrouter.error;
+                        }
+                    }
+
+                    result.style.background = '#D4EDDA';
+                    result.innerHTML = html;
+                } else {
+                    result.style.background = '#F8D7DA';
+                    result.innerHTML = '<strong>Error:</strong> ' + data.data;
+                }
+            })
+            .catch( err => {
+                result.style.background = '#F8D7DA';
+                result.innerHTML = '<strong>Error:</strong> ' + err.message + '<br><small>Check browser console for details (F12)</small>';
+            });
+        });
+    }
+
+    // Reset stuck questions
+    const resetStuckBtn = document.getElementById('sc-reset-stuck');
+    if (resetStuckBtn) {
+        resetStuckBtn.addEventListener('click', function() {
+            const result = document.getElementById('sc-api-test-result');
+            result.style.display = 'block';
+            result.style.background = '#FFF3CD';
+            result.innerHTML = '<strong>Resetting stuck questions...</strong>';
+
+            fetch(ajaxurl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    action: 'sc_ai_reset_stuck',
+                    nonce: '<?= wp_create_nonce( 'sc_ai_nonce' ); ?>',
+                }),
+            })
+            .then( r => r.json() )
+            .then( data => {
+                if ( data.success ) {
+                    result.style.background = '#D4EDDA';
+                    let msg = '<strong>Reset Complete!</strong><br>';
+                    if ( data.data.locks_cleared ) {
+                        msg += '✅ Cleared batch locks<br>';
+                    }
+                    if ( data.data.reset_count > 0 ) {
+                        msg += '✅ Reset ' + data.data.reset_count + ' stuck questions to pending.';
+                    } else {
+                        msg += 'No stuck questions found.';
+                    }
+                    result.innerHTML = msg;
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    result.style.background = '#F8D7DA';
+                    result.innerHTML = '<strong>Error:</strong> ' + data.data;
+                }
+            })
+            .catch( err => {
+                result.style.background = '#F8D7DA';
+                result.innerHTML = '<strong>Error:</strong> ' + err.message;
+            });
+        });
+    }
+
+    // Manual cron trigger
     const cronBtn = document.getElementById('sc-manual-cron');
     if (cronBtn) {
         cronBtn.addEventListener('click', function(e) {
