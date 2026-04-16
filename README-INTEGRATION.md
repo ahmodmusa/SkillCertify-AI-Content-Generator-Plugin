@@ -1,71 +1,130 @@
 # AI Content Generator Integration Guide
 
 ## Overview
-This plugin generates SEO-optimized descriptions and FAQs for Skill Certify Pro questions using free AI APIs (Gemini + Groq fallback).
+This plugin generates SEO-optimized descriptions and FAQs for Skill Certify Pro questions using free AI APIs (Groq and OpenRouter) with automatic failover and circuit breaker pattern.
 
-## Updates Made
+## Architecture Updates
 
-### 1. Fixed Post Type & Taxonomy
-- **Before**: `sc_question`, `sc_category`
-- **After**: `scp_question`, `scp_category` (matches Skill Certify Pro)
+### New Service-Based Architecture
+The plugin has been refactored with a modern service-oriented architecture:
+- **Dependency Injection**: Service container manages all dependencies
+- **API Providers**: Pluggable API provider interface with Groq and OpenRouter
+- **Circuit Breaker**: Automatic failover between providers on failure
+- **Queue System**: Action Scheduler for async batch processing
+- **Draft Queue Toggle**: Option to skip draft stage and generate directly
 
-### 2. Updated Data Retrieval
-- **Before**: Read from `_sc_question_data` meta
-- **After**: Reads from Skill Certify Pro meta keys:
-  - `_scp_option_a`, `_scp_option_b`, `_scp_option_c`, `_scp_option_d`
-  - `_scp_correct_answer`
-  - `post_content` or `_scp_explanation`
+### Removed Gemini
+- Gemini provider has been removed
+- Use Groq (ultra-fast) or OpenRouter (multi-model) instead
 
-### 3. Fixed Admin Menu
-- **Before**: Parent slug `skillcertify`
-- **After**: Parent slug `scp-dashboard` (matches Skill Certify Pro menu)
-
-### 4. Template Integration Functions
-Added in `class-content-saver.php`:
-- `scp_output_ai_faq_schema()` - Outputs FAQ schema JSON-LD
-- `scp_get_ai_exam_tip()` - Gets exam tip string
-- `scp_has_ai_content()` - Checks if AI content exists
-- `scp_get_ai_faqs()` - Gets AI-generated FAQs array
-- `scp_output_ai_exam_tip()` - Outputs styled exam tip
-
-### 5. Manual Generation
-Added `generate_single()` method in `class-batch-processor.php` for on-demand generation.
+### New File Structure
+```
+sc-ai-content-generator/
+├── sc-ai-content-generator.php          # Main plugin file (bootstrap)
+├── composer.json                         # Autoloader config
+├── config/
+│   ├── constants.php                     # Plugin constants
+│   └── defaults.php                     # Default settings
+├── src/
+│   ├── Core/
+│   │   ├── Plugin.php                   # Main plugin class
+│   │   ├── ServiceProvider.php          # Dependency injection
+│   │   └── Bootstrap.php                # Autoloader setup
+│   ├── Services/
+│   │   ├── API/
+│   │   │   ├── ApiProviderInterface.php
+│   │   │   ├── GroqProvider.php
+│   │   │   ├── OpenRouterProvider.php
+│   │   │   ├── ProviderPool.php
+│   │   │   └── CircuitBreaker.php
+│   │   ├── Queue/
+│   │   │   ├── QueueManager.php
+│   │   │   ├── DraftQueue.php
+│   │   │   ├── FinalQueue.php
+│   │   │   └── RetryQueue.php
+│   │   ├── Generator/
+│   │   │   ├── GeneratorService.php
+│   │   │   ├── DraftGenerator.php
+│   │   │   └── FinalGenerator.php
+│   │   ├── Prompt/
+│   │   │   ├── DraftPromptBuilder.php
+│   │   │   └── FinalPromptBuilder.php
+│   │   ├── Parser/
+│   │   │   └── StructuredParser.php
+│   │   └── Storage/
+│   │       ├── ContentStorage.php
+│   │       └── ProgressTracker.php
+│   ├── Repositories/
+│   │   ├── QuestionRepository.php
+│   │   └── ProgressRepository.php
+│   ├── Models/
+│   │   ├── Question.php
+│   │   ├── GenerationResult.php
+│   │   └── ApiConfig.php
+│   ├── Admin/
+│   │   ├── DashboardController.php
+│   │   ├── SettingsController.php
+│   │   └── AjaxController.php
+│   └── Frontend/
+│       ├── TemplateFunctions.php
+│       └── Shortcodes.php
+├── views/
+│   ├── dashboard.php                    # Dashboard template
+│   └── settings.php                     # Settings template
+├── assets/
+│   ├── css/
+│   │   └── admin.css
+│   └── js/
+│       └── admin.js
+└── database/
+    ├── migrations/
+    │   └── 001_create_progress_table.php
+    └── seeds/
+        └── default_settings.php
+```
 
 ---
 
 ## Step-by-Step Integration
 
-### Step 1: Configure API Keys
-1. Go to **Skill Certify Pro → 🤖 AI Generator**
-2. Get free Gemini key: https://aistudio.google.com/app/apikey
-3. Get free Groq key: https://console.groq.com
-4. Save both keys (Gemini is primary, Groq is fallback)
+### Step 1: Install Dependencies
+```bash
+cd wp-content/plugins/sc-ai-content-generator
+composer install
+```
 
-### Step 2: Run Initial Batch
-1. In AI Generator admin page
-2. Click **"▶ Run 100 Now"** or **"⚡ Run 500 Now"**
-3. Wait for processing (4 seconds per question due to rate limits)
-4. Check progress bar and stats
+### Step 2: Configure API Keys
+1. Go to **AI Dashboard → ⚙️ AI Settings**
+2. Get free Groq key: https://console.groq.com
+3. Get free OpenRouter key: https://openrouter.ai
+4. Save both keys (Groq is primary, OpenRouter is fallback)
+5. Configure queue settings (draft queue toggle, batch sizes, cron intervals)
 
-### Step 3: Integrate with Single Question Template
+### Step 3: Run Initial Batch
+1. In AI Settings page
+2. Click **"📝 Generate Draft"** or **"✨ Generate Final"**
+3. Wait for processing (max 10 questions per manual batch)
+4. Check progress bar and stats on Dashboard
+
+### Step 4: Integrate with Single Question Template
 
 Add this to `single-question.php` in Skill Certify Pro:
 
 ```php
 // After get_header(), include AI functions if plugin is active
-if ( function_exists( 'scp_has_ai_content' ) && scp_has_ai_content( get_the_ID() ) ) {
+if ( function_exists( 'scp_has_unified_content' ) && scp_has_unified_content( get_the_ID() ) ) {
     
     // Output AI-generated exam tip (optional, after CTA section)
     scp_output_ai_exam_tip( get_the_ID() );
     
     // Replace or enhance existing FAQ section with AI FAQs
-    $ai_faqs = scp_get_ai_faqs( get_the_ID() );
+    $ai_faqs = scp_get_unified_faqs( get_the_ID() );
     if ( ! empty( $ai_faqs ) ) {
         // Use AI FAQs instead of generated FAQs
         $faqs = array_map( function( $f ) {
             return [
-                'question' => $f['q'],
-                'answer' => $f['a']
+                'question' => $f['q'] ?? $f['question'] ?? '',
+                'answer' => $f['a'] ?? $f['answer'] ?? ''
             ];
         }, $ai_faqs );
     }
@@ -77,108 +136,14 @@ if ( function_exists( 'scp_output_ai_faq_schema' ) ) {
 }
 ```
 
-### Step 4: Add Manual Generation Button (Optional)
+### Step 5: Use Shortcodes (Optional)
 
-Add to question edit screen in `meta-fields.php` or create a new metabox:
+You can also use shortcodes to display AI content:
 
 ```php
-// Add meta box for AI generation
-add_action( 'add_meta_boxes', function() {
-    add_meta_box(
-        'sc_ai_generator',
-        '🤖 AI Content Generator',
-        'sc_ai_meta_box_callback',
-        'scp_question',
-        'side',
-        'high'
-    );
-});
-
-function sc_ai_meta_box_callback( $post ) {
-    $has_ai = function_exists( 'scp_has_ai_content' ) && scp_has_ai_content( $post->ID );
-    $generated_at = get_post_meta( $post->ID, '_sc_ai_generated_at', true );
-    
-    ?>
-    <div id="sc-ai-status">
-        <?php if ( $has_ai ) : ?>
-            <p style="color:green">✅ AI content generated</p>
-            <p style="font-size:12px;color:#666">Generated: <?php echo esc_html( $generated_at ); ?></p>
-            <button type="button" id="sc-regenerate-btn" class="button button-secondary">
-                🔄 Regenerate
-            </button>
-        <?php else : ?>
-            <p style="color:#666">No AI content yet</p>
-            <button type="button" id="sc-generate-btn" class="button button-primary">
-                🚀 Generate Now
-            </button>
-        <?php endif; ?>
-        <p id="sc-ai-message" style="margin-top:10px;font-size:12px;"></p>
-    </div>
-    
-    <script>
-    document.getElementById('sc-generate-btn')?.addEventListener('click', function() {
-        const btn = this;
-        const msg = document.getElementById('sc-ai-message');
-        btn.disabled = true;
-        msg.textContent = 'Generating... please wait (10-15 seconds)';
-        
-        fetch('<?php echo admin_url( 'admin-ajax.php' ); ?>', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({
-                action: 'sc_ai_generate_single',
-                post_id: <?php echo $post->ID; ?>,
-                nonce: '<?php echo wp_create_nonce( 'sc_ai_single' ); ?>'
-            })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if ( data.success ) {
-                msg.textContent = '✅ Generated successfully! Refresh page to see changes.';
-                msg.style.color = 'green';
-            } else {
-                msg.textContent = '❌ Error: ' + (data.data || 'Unknown error');
-                msg.style.color = 'red';
-                btn.disabled = false;
-            }
-        })
-        .catch(() => {
-            msg.textContent = '❌ Network error';
-            msg.style.color = 'red';
-            btn.disabled = false;
-        });
-    });
-    
-    document.getElementById('sc-regenerate-btn')?.addEventListener('click', function() {
-        // Same as generate but with regenerate flag
-        // Implementation similar to above
-    });
-    </script>
-    <?php
-}
-
-// AJAX handler for single question generation
-add_action( 'wp_ajax_sc_ai_generate_single', function() {
-    check_ajax_referer( 'sc_ai_single', 'nonce' );
-    if ( ! current_user_can( 'manage_options' ) ) wp_die();
-    
-    $post_id = intval( $_POST['post_id'] );
-    
-    if ( ! class_exists( 'SC_Batch_Processor' ) ) {
-        require_once plugin_dir_path( __FILE__ ) . 'includes/class-batch-processor.php';
-        require_once plugin_dir_path( __FILE__ ) . 'includes/class-ai-client.php';
-        require_once plugin_dir_path( __FILE__ ) . 'includes/class-prompt-builder.php';
-    }
-    
-    $processor = new SC_Batch_Processor();
-    $result = $processor->generate_single( $post_id );
-    
-    if ( $result['success'] ) {
-        wp_send_json_success();
-    } else {
-        wp_send_json_error( $result['error'] );
-    }
-});
+echo do_shortcode( '[sc_ai_description stage="auto"]' );
+echo do_shortcode( '[sc_ai_faqs stage="auto"]' );
+echo do_shortcode( '[sc_ai_exam_tip]' );
 ```
 
 ---
@@ -186,32 +151,38 @@ add_action( 'wp_ajax_sc_ai_generate_single', function() {
 ## How It Works
 
 ### Content Generation Flow
-1. **Batch Processor** picks pending questions from DB
-2. **Prompt Builder** creates structured AI prompt with:
+1. **Queue Manager** enqueues actions via Action Scheduler
+2. **Draft/Final Generator** picks pending questions from DB
+3. **Prompt Builder** creates structured AI prompt with:
    - Question title, correct answer, explanation
    - All options (correct + wrong)
    - Category and exam name
-   - Existing content (for improvement)
-3. **AI Client** calls Gemini API (free: 1500/day)
-   - Falls back to Groq if Gemini fails
-   - Rate limit: 4 seconds between requests
-4. **Parser** extracts structured output:
-   - `[DESCRIPTION]` - 3 paragraphs (150-200 words)
+   - Existing content (for polishing stage)
+4. **Provider Pool** calls API with automatic failover:
+   - Tries Groq first (ultra-fast)
+   - Falls back to OpenRouter on failure
+   - Circuit breaker prevents cascading failures
+5. **Parser** extracts structured output:
+   - `[DESCRIPTION]` - 3 paragraphs (200-250 words each)
    - `[FAQ_1_QUESTION/ANSWER]` - Question + answer
-   - `[FAQ_2_QUESTION/ANSWER]` - Why correct answer
-   - `[FAQ_3_QUESTION/ANSWER]` - Memory tip/mistake
+   - `[FAQ_2_QUESTION/ANSWER]` - Question + answer
+   - `[FAQ_3_QUESTION/ANSWER]` - Question + answer
    - `[EXAM_TIP]` - Exam strategy
-5. **Content Saver** saves:
-   - Description to `post_content`
-   - FAQs to `_sc_ai_faqs` meta
-   - Exam tip to `_sc_ai_exam_tip` meta
-   - Timestamps for tracking
+6. **Content Storage** saves:
+   - Draft content to `_scp_description_draft`, `_scp_faqs_draft`
+   - Final content to `_scp_description_final`, `_scp_faqs_final`
+   - Exam tip to `_scp_ai_exam_tip`
+   - Clears cache on save
+7. **Progress Tracker** updates status in custom DB table
 
-### Daily Cron Job
-- Runs every day at 2:00 AM
-- Processes 100 questions per day (configurable)
-- Retries failed questions up to 3 times
-- Tracks progress in custom DB table
+### Draft Queue Mode
+- **ON**: Two-stage pipeline (draft → final)
+- **OFF**: Single-stage (final only, skips draft)
+
+### Cron Jobs
+- **Draft Batch**: Runs at configured interval (hourly, twice daily, daily)
+- **Final Batch**: Runs at configured time daily (default: 04:00)
+- Uses Action Scheduler for reliable async processing
 
 ---
 
@@ -219,28 +190,24 @@ add_action( 'wp_ajax_sc_ai_generate_single', function() {
 
 ### 1. Test the Integration
 1. Activate the AI Content Generator plugin
-2. Configure API keys
-3. Run a small batch (10 questions)
-4. Check a question page to see AI content
+2. Run `composer install` in plugin directory
+3. Configure API keys
+4. Run a small manual batch (5 questions)
+5. Check Dashboard for stats and timeline
+6. Check a question page to see AI content
 
 ### 2. Customize Prompt (Optional)
-Edit `class-prompt-builder.php` to:
+Edit `src/Services/Prompt/DraftPromptBuilder.php` or `FinalPromptBuilder.php` to:
 - Change word counts
 - Add more sections
 - Adjust tone/style
 - Add category-specific instructions
 
-### 3. Add Regeneration Feature
-Implement the AJAX handler shown in Step 4 to allow:
-- Manual regeneration per question
-- Force refresh of outdated content
-- Batch regeneration by category
-
-### 4. Monitor & Optimize
-- Check progress stats regularly
+### 3. Monitor & Optimize
+- Check Dashboard stats regularly
 - Review generated content quality
-- Adjust prompt if needed
-- Monitor API usage (Gemini dashboard)
+- Adjust queue settings if needed
+- Monitor API usage (provider dashboards)
 
 ---
 
@@ -253,18 +220,25 @@ Implement the AJAX handler shown in Step 4 to allow:
 
 ### "AI API call failed"
 - Verify API keys are correct
-- Check Gemini/Groq service status
-- Check rate limits (Gemini: 15/min)
+- Check Groq/OpenRouter service status
+- Check rate limits (Groq: 30/min, OpenRouter: varies)
+- Check circuit breaker status in logs
 
 ### "Failed to parse AI output"
 - AI returned malformed output
 - Check prompt format
-- May need to adjust parsing regex
+- May need to adjust parsing regex in StructuredParser
 
 ### Content not showing on frontend
 - Verify functions are included
-- Check `scp_has_ai_content()` returns true
+- Check `scp_has_unified_content()` returns true
 - Ensure template integration is correct
+- Clear transients if caching issues
+
+### Draft queue not working
+- Check "Enable Draft Queue" setting in AI Settings
+- Verify cron jobs are scheduled
+- Check Action Scheduler logs
 
 ---
 
@@ -272,26 +246,10 @@ Implement the AJAX handler shown in Step 4 to allow:
 
 | Service | Free Tier | Rate Limit |
 |---------|-----------|------------|
-| Gemini | 1500/day | 15 requests/minute |
 | Groq | Unlimited | 30 requests/minute |
+| OpenRouter | Free tier available | Varies by model |
 
-Current batch processing: 4 seconds delay between requests (stays within Gemini limits).
-
----
-
-## File Structure
-
-```
-sc-ai-content-generator/
-├── sc-ai-content-generator.php          # Main plugin file
-├── includes/
-│   ├── class-ai-client.php               # API calls (Gemini/Groq)
-│   ├── class-batch-processor.php         # Batch processing
-│   ├── class-content-saver.php          # Template functions
-│   └── class-prompt-builder.php         # Prompt generation
-└── admin/
-    └── settings-page.php                 # Admin interface
-```
+Current batch processing: 2-6 seconds delay between requests (stays within rate limits).
 
 ---
 
@@ -300,5 +258,6 @@ sc-ai-content-generator/
 For issues or questions:
 1. Check WordPress debug log
 2. Review progress table: `wp_sc_ai_progress`
-3. Verify API keys in settings
-4. Test with single question generation first
+3. Verify API keys in AI Settings
+4. Test with manual batch first
+5. Check Dashboard timeline for activity history

@@ -1,0 +1,14 @@
+{
+    "name": "sc-ai/sc-ai-content-generator",
+    "description": "AI Content Generator for WordPress",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "autoload": {
+        "psr-4": {
+            "SC_AI\\ContentGenerator\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=7.4"
+    }
+}
