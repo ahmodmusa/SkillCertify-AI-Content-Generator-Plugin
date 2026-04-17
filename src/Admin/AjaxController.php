@@ -23,9 +23,7 @@ class AjaxController {
     }
 
     public function boot(): void {
-        add_action( 'wp_ajax_sc_ai_generate_draft', [ $this, 'handleGenerateDraft' ] );
-        add_action( 'wp_ajax_sc_ai_generate_final', [ $this, 'handleGenerateFinal' ] );
-        add_action( 'wp_ajax_sc_ai_draft_batch_manual', [ $this, 'handleDraftBatchManual' ] );
+        add_action( 'wp_ajax_sc_ai_generate', [ $this, 'handleGenerate' ] );
         add_action( 'wp_ajax_sc_ai_final_batch_manual', [ $this, 'handleFinalBatchManual' ] );
         add_action( 'wp_ajax_sc_ai_get_stats', [ $this, 'handleGetStats' ] );
         add_action( 'wp_ajax_sc_ai_get_status_table', [ $this, 'handleGetStatusTable' ] );
@@ -35,7 +33,7 @@ class AjaxController {
         add_action( 'wp_ajax_sc_ai_manual_cron', [ $this, 'handleManualCron' ] );
     }
 
-    public function handleGenerateDraft(): void {
+    public function handleGenerate(): void {
         check_ajax_referer( 'sc_ai_nonce', 'nonce' );
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( [ 'message' => 'Permission denied' ] );
@@ -47,65 +45,21 @@ class AjaxController {
         }
 
         try {
-            // Always use direct generation (draft + final in one call)
-            $result = $this->generator_service->generateDirect( $post_id );
-            wp_send_json_success( $result );
-        } catch ( \Exception $e ) {
-            error_log( '[SC AI] Direct generation exception: ' . $e->getMessage() );
-            wp_send_json_error( [ 'message' => 'An error occurred' ] );
-        }
-    }
-
-    public function handleGenerateFinal(): void {
-        check_ajax_referer( 'sc_ai_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( [ 'message' => 'Permission denied' ] );
-        }
-
-        $post_id = absint( $_POST['post_id'] ?? 0 );
-        if ( ! $post_id ) {
-            wp_send_json_error( [ 'message' => 'Invalid post ID' ] );
-        }
-
-        try {
-            error_log( '[SC AI] Generating final for post ID: ' . $post_id );
-            $result = $this->generator_service->generateFinal( $post_id );
-            error_log( '[SC AI] Final generation result: ' . json_encode( $result ) );
-            wp_send_json_success( $result );
-        } catch ( \Exception $e ) {
-            error_log( '[SC AI] Final generation exception: ' . $e->getMessage() );
-            wp_send_json_error( [ 'message' => 'An error occurred' ] );
-        }
-    }
-
-    public function handleDraftBatchManual(): void {
-        check_ajax_referer( 'sc_ai_nonce', 'nonce' );
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( [ 'message' => 'Permission denied' ] );
-        }
-
-        $batch = absint( $_POST['batch'] ?? 5 );
-        if ( $batch < 1 || $batch > 10 ) {
-            $batch = 5;
-        }
-
-        try {
-            // Use direct generation for batch processing
-            $result = $this->generator_service->processFinalBatch( $batch );
+            // Delete existing meta so content is fully replaced
+            delete_post_meta($post_id, '_scp_ai_description');
+            delete_post_meta($post_id, '_scp_ai_faqs');
+            delete_post_meta($post_id, '_scp_ai_exam_tip');
+            delete_post_meta($post_id, '_scp_description_final');
+            delete_post_meta($post_id, '_scp_faqs_final');
             
-            // Log to manual history
-            if ( isset( $result['generated'] ) && is_array( $result['generated'] ) ) {
-                foreach ( $result['generated'] as $question_id ) {
-                    $post = get_post( $question_id );
-                    if ( $post ) {
-                        $this->logManualHistory( $post->post_title, 'final', $question_id );
-                    }
-                }
-            }
+            // Reset progress so generator runs fresh
+            $progress_repo = $this->service_provider->get('repository.progress');
+            $progress_repo->upsertProgress($post_id, 'pending', 'none', '');
             
+            $result = $this->generator_service->generate( $post_id );
             wp_send_json_success( $result );
         } catch ( \Exception $e ) {
-            error_log( '[SC AI] Manual batch generation exception: ' . $e->getMessage() );
+            error_log( '[SC AI] Generation exception: ' . $e->getMessage() );
             wp_send_json_error( [ 'message' => 'An error occurred' ] );
         }
     }

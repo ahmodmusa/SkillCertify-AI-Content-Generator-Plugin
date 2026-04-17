@@ -34,35 +34,36 @@ class FinalQueue {
         ];
 
         $progress_table = $wpdb->prefix . SC_AI_PROGRESS_TABLE;
-        
-        // Get questions with draft but no final
+
+        // Use batch model for queue processing
+        $batch_model = get_option( 'sc_ai_groq_batch_model', 'llama-3.1-8b-instant' );
+        $original_model = get_option( 'sc_ai_groq_model' );
+        update_option( 'sc_ai_groq_model', $batch_model );
+
+        // Get questions without AI content
         $questions = $wpdb->get_results( $wpdb->prepare( "
             SELECT p.ID as question_id
             FROM {$wpdb->posts} p
-            LEFT JOIN {$progress_table} pr ON p.ID = pr.question_id
-            LEFT JOIN {$wpdb->postmeta} m1 ON p.ID = m1.post_id AND m1.meta_key = '_scp_description_draft'
-            LEFT JOIN {$wpdb->postmeta} m2 ON p.ID = m2.post_id AND m2.meta_key = '_scp_description_final'
-            WHERE p.post_type = 'scp_question' 
+            LEFT JOIN {$wpdb->postmeta} m ON p.ID = m.post_id AND m.meta_key = '_scp_ai_description'
+            WHERE p.post_type = 'scp_question'
             AND p.post_status = 'publish'
-            AND pr.content_stage = 'draft'
-            AND pr.status = 'done'
-            AND m1.meta_value IS NOT NULL 
-            AND m1.meta_value != ''
-            AND (m2.meta_id IS NULL OR m2.meta_value = '' OR (pr.status = 'failed' AND pr.attempts < 3))
+            AND (m.meta_id IS NULL OR m.meta_value = '')
             ORDER BY p.ID ASC
             LIMIT %d
         ", $batch_size ) );
 
         if ( empty( $questions ) ) {
+            // Restore original model even if no questions to process
+            update_option( 'sc_ai_groq_model', $original_model );
             return $results;
         }
 
         foreach ( $questions as $question ) {
             $results['processed']++;
-            
+
             try {
                 $result = $this->final_generator->generate( $question->question_id );
-                
+
                 if ( $result['success'] ) {
                     $results['success']++;
                     $results['generated'][] = $question->question_id;
@@ -72,16 +73,21 @@ class FinalQueue {
                     $results['errors'][] = "Q#{$question->question_id}: {$result['error']}";
                     error_log( "[SC AI] Final failed for question #{$question->question_id}: {$result['error']}" );
                 }
-                
-                // Rate limit delay
-                sleep( SC_AI_RATE_LIMIT_OPENROUTER );
-                
+
+                // Rate limit delay based on provider used
+                $provider_used = $result['provider_used'] ?? 'openrouter';
+                $rate_limit = ( $provider_used === 'groq' ) ? SC_AI_RATE_LIMIT_GROQ : SC_AI_RATE_LIMIT_OPENROUTER;
+                sleep( $rate_limit );
+
             } catch ( \Exception $e ) {
                 $results['failed']++;
                 $results['errors'][] = "Q#{$question->question_id}: " . $e->getMessage();
                 error_log( "[SC AI] Final exception for question #{$question->question_id}: " . $e->getMessage() );
             }
         }
+
+        // Restore original model after processing
+        update_option( 'sc_ai_groq_model', $original_model );
 
         return $results;
     }

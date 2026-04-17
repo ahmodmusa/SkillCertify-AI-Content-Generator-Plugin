@@ -14,33 +14,40 @@ class ProgressRepository {
             [
                 'question_id' => $question_id,
                 'status' => SC_AI_STATUS_PENDING,
-                'content_stage' => $stage,
                 'attempts' => 0,
                 'generated_at' => null,
                 'error_msg' => null,
             ],
-            [ '%d', '%s', '%s', '%d', null, null ]
+            [ '%d', '%s', '%d', '%s', '%s' ]
         );
 
         return $result !== false;
     }
 
-    public function updateProgress( int $question_id, string $status, string $stage, string $error = '' ): bool {
+    /**
+     * Upsert progress record - insert or update with incrementing attempts
+     *
+     * @param int $question_id The question ID
+     * @param string $status The status (pending, processing, done, failed)
+     * @param string $stage The content stage (none, done)
+     * @param string $error Error message if any
+     * @return bool Success status
+     */
+    public function upsertProgress( int $question_id, string $status, string $stage, string $error = '' ): bool {
         global $wpdb;
         $table = $wpdb->prefix . SC_AI_PROGRESS_TABLE;
 
         $result = $wpdb->query( $wpdb->prepare( "
             INSERT INTO {$table}
-                (question_id, status, content_stage, attempts, generated_at, error_msg)
+                (question_id, status, attempts, generated_at, error_msg)
             VALUES
-                (%d, %s, %s, 1, %s, %s)
+                (%d, %s, 1, %s, %s)
             ON DUPLICATE KEY UPDATE
                 status       = VALUES(status),
-                content_stage = VALUES(content_stage),
                 attempts     = attempts + 1,
                 generated_at = VALUES(generated_at),
                 error_msg    = VALUES(error_msg)
-        ", $question_id, $status, $stage, current_time( 'mysql' ), $error ) );
+        ", $question_id, $status, current_time( 'mysql' ), $error ) );
 
         return $result !== false;
     }
@@ -83,9 +90,9 @@ class ProgressRepository {
         
         $result = $wpdb->update(
             $progress_table,
-            [ 'status' => 'pending', 'content_stage' => 'none' ],
+            [ 'status' => 'pending' ],
             [ 'status' => 'processing' ],
-            [ '%s', '%s' ],
+            [ '%s' ],
             [ '%s' ]
         );
         
@@ -119,17 +126,17 @@ class ProgressRepository {
             SELECT COUNT(DISTINCT pt.ID)
             FROM {$posts_table} pt
             INNER JOIN {$table} pr ON pt.ID = pr.question_id
-            WHERE pr.content_stage = 'final' AND pr.status = 'done'
+            WHERE pr.status = 'done'
             AND pt.post_type = 'scp_question'
             AND pt.post_status = 'publish'
         " );
 
-        // Count pending questions (no progress or content_stage = 'none')
+        // Count pending questions (no progress or status != done)
         $pending = $wpdb->get_var( "
             SELECT COUNT(DISTINCT pt.ID)
             FROM {$posts_table} pt
             LEFT JOIN {$table} pr ON pt.ID = pr.question_id
-            WHERE (pr.content_stage = 'none' OR pr.content_stage IS NULL)
+            WHERE (pr.status IS NULL OR pr.status != 'done')
             AND pt.post_type = 'scp_question'
             AND pt.post_status = 'publish'
         " );
@@ -137,16 +144,14 @@ class ProgressRepository {
         // Get last generation time
         $last_generated = $wpdb->get_var( "
             SELECT generated_at FROM {$table}
-            WHERE content_stage = 'final' AND status = 'done'
+            WHERE status = 'done'
             ORDER BY generated_at DESC LIMIT 1
         " );
 
         return [
             'total' => (int) ($total ?? 0),
-            'draft' => (int) ($generated ?? 0),
             'final' => (int) ($generated ?? 0),
             'pending' => (int) ($pending ?? 0),
-            'last_draft' => $last_generated ? date( 'M j, g:i A', strtotime( $last_generated ) ) : '',
             'last_final' => $last_generated ? date( 'M j, g:i A', strtotime( $last_generated ) ) : '',
         ];
     }
@@ -159,7 +164,6 @@ class ProgressRepository {
         $results = $wpdb->get_results( $wpdb->prepare( "
             SELECT DISTINCT
                 p.question_id,
-                p.content_stage,
                 p.generated_at,
                 p.status,
                 pt.post_title as question_title
@@ -172,13 +176,12 @@ class ProgressRepository {
 
         $activities = [];
         foreach ( $results as $row ) {
-            $type = $row->content_stage === 'final' ? 'final' : 'draft';
-            $message = $type === 'final' ? 'Final content generated' : 'Draft content generated';
-            
+            $message = 'Content generated';
+
             $activities[] = [
-                'type' => $type,
+                'type' => 'generated',
                 'message' => $message,
-                'time' => date( 'M j, g:i A', strtotime( $row->generated_at ) ),
+                'time' => \SC_AI\ContentGenerator\Helpers\DateHelper::formatTimeAgo( $row->generated_at ),
                 'question_id' => (int) $row->question_id,
                 'question_title' => $row->question_title,
             ];
@@ -191,19 +194,20 @@ class ProgressRepository {
         global $wpdb;
         $progress_table = $wpdb->prefix . SC_AI_PROGRESS_TABLE;
         $posts_table = $wpdb->posts;
+        $postmeta_table = $wpdb->postmeta;
         $offset = ( $page - 1 ) * $per_page;
 
         // Build WHERE clause based on filter
         $where = "WHERE pt.post_type = 'scp_question' AND pt.post_status = 'publish'";
-        
+
         if ( $filter === 'complete' ) {
-            $where .= " AND pr.content_stage = 'final' AND pr.status = 'done'";
+            $where .= " AND pr.status = 'done'";
         } elseif ( $filter === 'pending' ) {
-            $where .= " AND (pr.content_stage = 'none' OR pr.content_stage IS NULL)";
+            $where .= " AND (pr.status IS NULL OR pr.status != 'done')";
         }
 
         // Sort: pending first (oldest to newest), then complete (newest to oldest)
-        $order_by = "ORDER BY CASE WHEN pr.content_stage = 'none' OR pr.content_stage IS NULL THEN 0 ELSE 1 END, pt.ID ASC";
+        $order_by = "ORDER BY CASE WHEN pr.status IS NULL OR pr.status != 'done' THEN 0 ELSE 1 END, pt.ID ASC";
         if ( $filter === 'complete' ) {
             $order_by = "ORDER BY pt.ID DESC";
         }
@@ -217,12 +221,12 @@ class ProgressRepository {
         ";
         $total = $wpdb->get_var( $total_query );
 
-        // Get paginated questions
+        // Get paginated questions with generated timestamps
         $query = $wpdb->prepare( "
             SELECT
                 pt.ID as id,
                 pt.post_title as title,
-                COALESCE(pr.content_stage, 'none') as status,
+                COALESCE(pr.status, 'none') as status,
                 pr.generated_at
             FROM {$posts_table} pt
             LEFT JOIN {$progress_table} pr ON pt.ID = pr.question_id
@@ -235,38 +239,14 @@ class ProgressRepository {
 
         $questions = [];
         foreach ( $results as $row ) {
-            $draft_time = '';
-            $final_time = '';
-
-            // Get draft time from meta
-            $draft_meta = get_post_meta( $row->id, '_scp_description_draft', true );
-            if ( ! empty( $draft_meta ) ) {
-                $draft_progress = $wpdb->get_var( $wpdb->prepare( "
-                    SELECT generated_at FROM {$progress_table}
-                    WHERE question_id = %d AND content_stage = 'draft' AND status = 'done'
-                    ORDER BY generated_at DESC LIMIT 1
-                ", $row->id ) );
-                $draft_time = $draft_progress ? date( 'M j, g:i A', strtotime( $draft_progress ) ) : '';
-            }
-
-            // Get final time from meta
-            $final_meta = get_post_meta( $row->id, '_scp_description_final', true );
-            if ( ! empty( $final_meta ) ) {
-                $final_progress = $wpdb->get_var( $wpdb->prepare( "
-                    SELECT generated_at FROM {$progress_table}
-                    WHERE question_id = %d AND content_stage = 'final' AND status = 'done'
-                    ORDER BY generated_at DESC LIMIT 1
-                ", $row->id ) );
-                $final_time = $final_progress ? date( 'M j, g:i A', strtotime( $final_progress ) ) : '';
-            }
+            $generated_time = $row->generated_at ? date( 'M j, g:i A', strtotime( $row->generated_at ) ) : '';
 
             $questions[] = [
                 'id' => (int) $row->id,
                 'title' => $row->title,
                 'status' => $row->status,
-                'draft_time' => $draft_time,
-                'final_time' => $final_time,
-                'generated_time' => $final_time ?: $draft_time,
+                'final_time' => $generated_time,
+                'generated_time' => $generated_time,
                 'edit_link' => get_permalink( $row->id ),
             ];
         }

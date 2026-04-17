@@ -18,73 +18,58 @@ class ContentStorage {
         'scp_unified_content_',
     ];
 
-    public function saveDraft( int $post_id, array $parsed ): bool {
-        update_post_meta( $post_id, '_scp_description_draft', wp_kses_post( $parsed['description'] ) );
+    public function save( int $post_id, array $data ): bool {
+        $saved = true;
 
-        $faqs = [
-            [ 'question' => $parsed['faq1_q'], 'answer' => $parsed['faq1_a'] ],
-            [ 'question' => $parsed['faq2_q'], 'answer' => $parsed['faq2_a'] ],
-            [ 'question' => $parsed['faq3_q'], 'answer' => $parsed['faq3_a'] ],
-        ];
+        if ( ! empty( $data['description'] ) ) {
+            $clean_desc = wp_kses_post( $data['description'] );
+            // Decode any HTML-encoded quotes back to real chars
+            $clean_desc = html_entity_decode( $clean_desc, ENT_QUOTES, 'UTF-8' );
+            $saved = update_post_meta( $post_id, '_scp_ai_description', $clean_desc ) && $saved;
+            // Sync to parent plugin key
+            $saved = update_post_meta( $post_id, '_scp_description_final', $clean_desc ) && $saved;
+        }
 
-        $faqs = array_filter( $faqs, fn( $f ) => ! empty( $f['question'] ) && ! empty( $f['answer'] ) );
-        update_post_meta( $post_id, '_scp_faqs_draft', json_encode( array_values( $faqs ) ) );
-        update_post_meta( $post_id, '_scp_ai_exam_tip', sanitize_text_field( $parsed['exam_tip'] ) );
+        if ( ! empty( $data['exam_tip'] ) ) {
+            $saved = update_post_meta( $post_id, '_scp_ai_exam_tip', sanitize_text_field( $data['exam_tip'] ) ) && $saved;
+        }
+
+        // Build FAQ array for storage
+        $faqs = [];
+        for ( $i = 1; $i <= 5; $i++ ) {
+            $q = $data["faq{$i}_q"] ?? '';
+            $a = $data["faq{$i}_a"] ?? '';
+            if ( ! empty( $q ) && ! empty( $a ) ) {
+                $faqs[] = [
+                    'question' => wp_strip_all_tags( $q ),
+                    'answer'   => wp_strip_all_tags( $a ),
+                ];
+            }
+        }
+
+        if ( ! empty( $faqs ) ) {
+            // Use JSON_HEX_QUOT to escape all double quotes as \u0022
+            // This prevents inner quotes from breaking JSON structure
+            $json = json_encode( $faqs, JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT );
+            $saved = update_post_meta( $post_id, '_scp_ai_faqs', $json ) && $saved;
+        }
 
         $this->clearCache( $post_id );
-        return true;
+        return $saved;
     }
 
-    public function saveFinal( int $post_id, array $parsed ): bool {
-        update_post_meta( $post_id, '_scp_description_final', wp_kses_post( $parsed['description'] ) );
-
-        $faqs = [
-            [ 'question' => $parsed['faq1_q'], 'answer' => $parsed['faq1_a'] ],
-            [ 'question' => $parsed['faq2_q'], 'answer' => $parsed['faq2_a'] ],
-            [ 'question' => $parsed['faq3_q'], 'answer' => $parsed['faq3_a'] ],
-        ];
-
-        $faqs = array_filter( $faqs, fn( $f ) => ! empty( $f['question'] ) && ! empty( $f['answer'] ) );
-        update_post_meta( $post_id, '_scp_faqs_final', json_encode( array_values( $faqs ) ) );
-        update_post_meta( $post_id, '_scp_ai_exam_tip', sanitize_text_field( $parsed['exam_tip'] ) );
-
-        $this->clearCache( $post_id );
-        return true;
-    }
-
-    public function hasDraft( int $post_id ): bool {
-        $description = get_post_meta( $post_id, '_scp_description_draft', true );
+    public function hasContent( int $post_id ): bool {
+        $description = get_post_meta( $post_id, '_scp_ai_description', true );
         return ! empty( $description );
     }
 
-    public function hasFinal( int $post_id ): bool {
-        $description = get_post_meta( $post_id, '_scp_description_final', true );
-        return ! empty( $description );
-    }
-
-    public function getDraft( int $post_id ): ?array {
-        $description = get_post_meta( $post_id, '_scp_description_draft', true );
+    public function getContent( int $post_id ): ?array {
+        $description = get_post_meta( $post_id, '_scp_ai_description', true );
         if ( empty( $description ) ) {
             return null;
         }
 
-        $faqs_raw = get_post_meta( $post_id, '_scp_faqs_draft', true );
-        $faqs = is_string( $faqs_raw ) ? json_decode( $faqs_raw, true ) : $faqs_raw;
-        $faqs = is_array( $faqs ) ? $faqs : [];
-
-        return [
-            'description' => $description,
-            'faqs' => $faqs,
-        ];
-    }
-
-    public function getFinal( int $post_id ): ?array {
-        $description = get_post_meta( $post_id, '_scp_description_final', true );
-        if ( empty( $description ) ) {
-            return null;
-        }
-
-        $faqs_raw = get_post_meta( $post_id, '_scp_faqs_final', true );
+        $faqs_raw = get_post_meta( $post_id, '_scp_ai_faqs', true );
         $faqs = is_string( $faqs_raw ) ? json_decode( $faqs_raw, true ) : $faqs_raw;
         $faqs = is_array( $faqs ) ? $faqs : [];
 
@@ -98,9 +83,17 @@ class ContentStorage {
         foreach ( $this->cache_keys as $key ) {
             delete_transient( $key . $post_id );
         }
-        
+
         // Clear global caches
         delete_transient( SC_AI_CACHE_STATS );
         delete_transient( SC_AI_CACHE_ACTIVITIES . '15' );
+    }
+
+    private function sanitizeText( string $text ): string {
+        return str_replace(
+            [ "\u{201C}", "\u{201D}", "\u{2018}", "\u{2019}" ],
+            [ '"',        '"',        "'",         "'"        ],
+            $text
+        );
     }
 }

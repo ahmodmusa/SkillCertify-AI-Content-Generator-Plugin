@@ -3,7 +3,7 @@
 defined( 'ABSPATH' ) || exit;
 
 // Plugin Version
-define( 'SC_AI_VERSION', '2.0.0' );
+define( 'SC_AI_VERSION', '1.0.2' );
 
 // Plugin Paths - calculate from this file's location (config/ directory)
 $plugin_dir = dirname( __DIR__ ) . '/';
@@ -14,10 +14,8 @@ define( 'SC_AI_PLUGIN_BASENAME', plugin_basename( $plugin_dir . 'sc-ai-content-g
 // Table Names
 define( 'SC_AI_PROGRESS_TABLE', 'sc_ai_progress' );
 
-// Content Stages
+// Content stages
 define( 'SC_AI_STAGE_NONE', 'none' );
-define( 'SC_AI_STAGE_DRAFT', 'draft' );
-define( 'SC_AI_STAGE_FINAL', 'final' );
 
 // Generation Status
 define( 'SC_AI_STATUS_PENDING', 'pending' );
@@ -26,7 +24,6 @@ define( 'SC_AI_STATUS_DONE', 'done' );
 define( 'SC_AI_STATUS_FAILED', 'failed' );
 
 // Queue Hooks
-define( 'SC_AI_DRAFT_QUEUE_HOOK', 'sc_ai_draft_queue' );
 define( 'SC_AI_FINAL_QUEUE_HOOK', 'sc_ai_final_queue' );
 define( 'SC_AI_RETRY_QUEUE_HOOK', 'sc_ai_retry_queue' );
 

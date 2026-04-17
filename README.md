@@ -128,6 +128,12 @@ This plugin is part of the Skill Certify Pro ecosystem.
 
 ## Changelog
 
+### Version 1.0.2 (April 2026)
+
+**Updates:**
+- Updated plugin documentation and README
+- Minor improvements and optimizations
+
 ### Version 1.0.1 (April 2026)
 
 **Major Changes:**

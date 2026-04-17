@@ -42,7 +42,6 @@ class Plugin {
     }
 
     public function deactivate(): void {
-        wp_clear_scheduled_hook( SC_AI_DRAFT_QUEUE_HOOK );
         wp_clear_scheduled_hook( SC_AI_FINAL_QUEUE_HOOK );
         wp_clear_scheduled_hook( SC_AI_RETRY_QUEUE_HOOK );
     }

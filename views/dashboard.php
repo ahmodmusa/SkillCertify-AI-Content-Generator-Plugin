@@ -6,58 +6,6 @@
 defined( 'ABSPATH' ) || exit;
 ?>
 
-<style>
-    @media (max-width: 768px) {
-        .sc-ai-dashboard-grid {
-            grid-template-columns: 1fr !important;
-        }
-        .sc-ai-card {
-            padding: 15px !important;
-        }
-        .sc-ai-card h3 {
-            font-size: 12px !important;
-        }
-        .sc-ai-card > div[style*="font-size: 48px"] {
-            font-size: 32px !important;
-        }
-        .sc-ai-table-container {
-            overflow-x: auto !important;
-        }
-        .sc-ai-status-table {
-            font-size: 12px !important;
-        }
-        .sc-ai-status-table th,
-        .sc-ai-status-table td {
-            padding: 6px 4px !important;
-        }
-        .sc-ai-status-table td:nth-child(2) {
-            min-width: 200px !important;
-        }
-        .sc-ai-pagination {
-            flex-direction: column !important;
-            align-items: flex-start !important;
-        }
-        .sc-ai-filter {
-            font-size: 12px !important;
-            padding: 6px 12px !important;
-        }
-    }
-    @media (max-width: 480px) {
-        .sc-ai-status-table td:nth-child(2) {
-            min-width: 150px !important;
-        }
-        .sc-ai-status-table th:nth-child(3),
-        .sc-ai-status-table th:nth-child(4),
-        .sc-ai-status-table th:nth-child(5),
-        .sc-ai-status-table td:nth-child(3),
-        .sc-ai-status-table td:nth-child(4),
-        .sc-ai-status-table td:nth-child(5) {
-            width: auto !important;
-            min-width: 60px !important;
-        }
-    }
-</style>
-
 <div class="wrap">
     <h1>🤖 AI Content Dashboard</h1>
     <p>Overview of AI-generated content status</p>
@@ -91,13 +39,13 @@ defined( 'ABSPATH' ) || exit;
     <div style="margin-top: 30px; background: #fff; border: 1px solid #ccd0d4; padding: 20px; border-radius: 8px;">
         <h3 style="margin: 0 0 15px 0;">Content Generation Progress</h3>
         <?php 
-        $progress = $stats['total'] > 0 ? ( ( $stats['draft'] + $stats['final'] ) / $stats['total'] * 100 ) : 0;
+        $progress = $stats['total'] > 0 ? ( $stats['final'] / $stats['total'] * 100 ) : 0;
         ?>
         <div style="background: #e5e5e5; height: 20px; border-radius: 10px; overflow: hidden;">
             <div style="background: linear-gradient(90deg, #2271b1 0%, #00a32a 100%); height: 100%; width: <?php echo esc_attr( $progress ); ?>%; transition: width 0.3s;"></div>
         </div>
         <div style="margin-top: 10px; font-size: 14px; color: #646970;">
-            <strong><?php echo number_format( $progress, 1 ); ?>%</strong> complete (<?php echo esc_html( $stats['draft'] + $stats['final'] ); ?> of <?php echo esc_html( $stats['total'] ); ?> questions)
+            <strong><?php echo number_format( $progress, 1 ); ?>%</strong> complete (<?php echo esc_html( $stats['final'] ); ?> of <?php echo esc_html( $stats['total'] ); ?> questions)
         </div>
     </div>
     
@@ -113,8 +61,7 @@ defined( 'ABSPATH' ) || exit;
                     <tr>
                         <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Type</th>
                         <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Message</th>
-                        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Question</th>
-                        <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Time</th>
+                        <th style="padding: 10px; text-align: left; border-bottom: 1px solid #e5e5e5;">Generated Time</th>
                         <th style="padding: 10px; text-align: left; border-bottom: 2px solid #ddd;">Actions</th>
                     </tr>
                 </thead>
@@ -122,7 +69,7 @@ defined( 'ABSPATH' ) || exit;
                     <?php foreach ( $activities as $activity ) : ?>
                     <tr style="border-bottom: 1px solid #eee;">
                         <td style="padding: 8px;">
-                            <span style="color: <?php echo $activity['type'] === 'draft' ? '#00a32a' : '#d63638'; ?>; font-weight: bold;">
+                            <span style="color: #00a32a; font-weight: bold;">
                                 <?php echo esc_html( ucfirst( $activity['type'] ) ); ?>
                             </span>
                         </td>
@@ -140,10 +87,10 @@ defined( 'ABSPATH' ) || exit;
                         <td style="padding: 8px;">
                             <?php if ( ! empty( $activity['question_id'] ) ) : ?>
                                 <?php 
-                                $has_final = get_post_meta( $activity['question_id'], '_scp_description_final', true );
+                                $has_content = get_post_meta( $activity['question_id'], '_scp_ai_description', true );
                                 ?>
-                                <?php if ( ! $has_final ) : ?>
-                                    <button class="button button-small" style="font-size: 11px; padding: 4px 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; border-radius: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(102, 126, 234, 0.3)';" onclick="scAiGenerateDraft(<?php echo esc_attr( $activity['question_id'] ); ?>); setTimeout(() => location.reload(), 2500);">
+                                <?php if ( ! $has_content ) : ?>
+                                    <button class="button button-small" style="font-size: 11px; padding: 4px 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; color: white; border-radius: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);" onmouseover="this.style.transform='translateY(-1px)'; this.style.boxShadow='0 4px 12px rgba(102, 126, 234, 0.4)';" onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 8px rgba(102, 126, 234, 0.3)';" onclick="scAiGenerate(<?php echo esc_attr( $activity['question_id'] ); ?>); setTimeout(() => location.reload(), 2500);">
                                         ✨ Generate
                                     </button>
                                 <?php else : ?>

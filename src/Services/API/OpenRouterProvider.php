@@ -38,7 +38,7 @@ class OpenRouterProvider implements ApiProviderInterface {
                     'content' => $prompt,
                 ] ],
                 'temperature' => 0.3,
-                'max_tokens'  => 1024,
+                'max_tokens'  => 4000,
             ] ),
             'timeout' => $this->timeout,
         ] );

@@ -1,7 +1,19 @@
 <?php
 defined( 'ABSPATH' ) || exit;
 
-$config = \SC_AI\ContentGenerator\Models\ApiConfig::fromOptions();
+$config = [
+    'primary_provider' => get_option( 'sc_ai_primary_provider', 'groq' ),
+    'fallback_provider' => get_option( 'sc_ai_fallback_provider', 'openrouter' ),
+    'groq_key' => get_option( 'sc_ai_groq_key', '' ),
+    'openrouter_key' => get_option( 'sc_ai_openrouter_key', '' ),
+    'groq_model' => get_option( 'sc_ai_groq_model', 'llama-3.1-8b-instant' ),
+    'groq_max_tokens' => get_option( 'sc_ai_groq_max_tokens', 4000 ),
+    'groq_batch_model' => get_option( 'sc_ai_groq_batch_model', 'llama-3.1-8b-instant' ),
+    'openrouter_model' => get_option( 'sc_ai_openrouter_model', 'openai/gpt-3.5-turbo' ),
+    'final_batch_size' => get_option( 'sc_ai_final_batch_size', 20 ),
+    'final_cron_time' => get_option( 'sc_ai_final_cron_time', '04:00' ),
+    'enable_cron' => get_option( 'sc_ai_enable_cron', '1' ),
+];
 ?>
 
 <div class="wrap">
@@ -21,8 +33,8 @@ $config = \SC_AI\ContentGenerator\Models\ApiConfig::fromOptions();
             <th>Primary Provider</th>
             <td>
               <select name="primary_provider" class="regular-text">
-                <option value="groq" <?= selected( $config->primary_provider, 'groq' ) ?>>Groq (Fast, 30 req/min)</option>
-                <option value="openrouter" <?= selected( $config->primary_provider, 'openrouter' ) ?>>OpenRouter (Multi-model)</option>
+                <option value="groq" <?= selected( $config['primary_provider'], 'groq' ) ?>>Groq (Fast, 30 req/min)</option>
+                <option value="openrouter" <?= selected( $config['primary_provider'], 'openrouter' ) ?>>OpenRouter (Multi-model)</option>
               </select>
               <p class="description">
                 Primary API to use. The other will be used as fallback if primary fails.
@@ -33,8 +45,8 @@ $config = \SC_AI\ContentGenerator\Models\ApiConfig::fromOptions();
             <th>Fallback Provider</th>
             <td>
               <select name="fallback_provider" class="regular-text">
-                <option value="openrouter" <?= selected( $config->fallback_provider, 'openrouter' ) ?>>OpenRouter</option>
-                <option value="groq" <?= selected( $config->fallback_provider, 'groq' ) ?>>Groq</option>
+                <option value="openrouter" <?= selected( $config['fallback_provider'], 'openrouter' ) ?>>OpenRouter</option>
+                <option value="groq" <?= selected( $config['fallback_provider'], 'groq' ) ?>>Groq</option>
               </select>
               <p class="description">
                 Fallback API if primary fails.
@@ -45,7 +57,7 @@ $config = \SC_AI\ContentGenerator\Models\ApiConfig::fromOptions();
             <th>Groq API Key <span style="color:blue">(Ultra-fast)</span></th>
             <td>
               <input type="text" name="groq_key" class="regular-text"
-                     value="<?= esc_attr( $config->groq_key ) ?>"
+                     value="<?= esc_attr( $config['groq_key'] ) ?>"
                      placeholder="gsk_...">
               <p class="description">
                 Get free key: <a href="https://console.groq.com" target="_blank">console.groq.com</a>
@@ -56,7 +68,7 @@ $config = \SC_AI\ContentGenerator\Models\ApiConfig::fromOptions();
             <th>OpenRouter API Key <span style="color:green">(Multi-model)</span></th>
             <td>
               <input type="text" name="openrouter_key" class="regular-text"
-                     value="<?= esc_attr( $config->openrouter_key ) ?>"
+                     value="<?= esc_attr( $config['openrouter_key'] ) ?>"
                      placeholder="sk-or-...">
               <p class="description">
                 Get free key: <a href="https://openrouter.ai" target="_blank">openrouter.ai</a>
@@ -67,15 +79,50 @@ $config = \SC_AI\ContentGenerator\Models\ApiConfig::fromOptions();
             <th>Groq Model</th>
             <td>
               <input type="text" name="groq_model" class="regular-text"
-                     value="<?= esc_attr( $config->groq_model ) ?>"
+                     value="<?= esc_attr( $config['groq_model'] ) ?>"
                      placeholder="llama-3.1-8b-instant">
+            </td>
+          </tr>
+          <tr>
+            <th>Max Tokens (Single Generate)</th>
+            <td>
+              <input type="number"
+                name="groq_max_tokens"
+                value="<?= esc_attr( $config['groq_max_tokens'] ) ?>"
+                min="1000" max="8000" step="500"
+                style="width:100px" />
+              <p class="description">
+                Tokens for manual/single generation.
+                Higher = longer content but slower.
+                Recommended: 4000.
+                Free tier max: 6000.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <th>Groq Batch Model</th>
+            <td>
+              <select name="groq_batch_model">
+                <option value="llama-3.1-8b-instant"
+                  <?= selected( $config['groq_batch_model'], 'llama-3.1-8b-instant' ); ?>>
+                  llama-3.1-8b-instant (Fast, free tier friendly)
+                </option>
+                <option value="llama-3.3-70b-versatile"
+                  <?= selected( $config['groq_batch_model'], 'llama-3.3-70b-versatile' ); ?>>
+                  llama-3.3-70b-versatile (Better quality)
+                </option>
+              </select>
+              <p class="description">
+                Model used for cron/batch processing.
+                Use fast model for free tier to avoid rate limits.
+              </p>
             </td>
           </tr>
           <tr>
             <th>OpenRouter Model</th>
             <td>
               <input type="text" name="openrouter_model" class="regular-text"
-                     value="<?= esc_attr( $config->openrouter_model ) ?>"
+                     value="<?= esc_attr( $config['openrouter_model'] ) ?>"
                      placeholder="openai/gpt-3.5-turbo">
             </td>
           </tr>
@@ -96,7 +143,7 @@ $config = \SC_AI\ContentGenerator\Models\ApiConfig::fromOptions();
             <th>Batch Size</th>
             <td>
               <input type="number" name="final_batch_size" class="small-text"
-                     value="<?= esc_attr( $config->final_batch_size ) ?>"
+                     value="<?= esc_attr( $config['final_batch_size'] ) ?>"
                      min="1" max="100" style="width:80px">
               <p class="description">
                 Number of questions to process per batch
@@ -107,7 +154,7 @@ $config = \SC_AI\ContentGenerator\Models\ApiConfig::fromOptions();
             <th>Cron Time</th>
             <td>
               <input type="time" name="final_cron_time" class="small-text"
-                     value="<?= esc_attr( $config->final_cron_time ) ?>">
+                     value="<?= esc_attr( $config['final_cron_time'] ) ?>">
               <p class="description">
                 Time to run the batch cron job (24h format)
               </p>
@@ -118,7 +165,7 @@ $config = \SC_AI\ContentGenerator\Models\ApiConfig::fromOptions();
             <td>
               <label style="display:flex;align-items:center;gap:8px">
                 <input type="checkbox" name="enable_cron" value="1"
-                       <?= checked( $config->enable_cron, true ) ?>>
+                       <?= checked( $config['enable_cron'], true ) ?>>
                 <span>Enable automatic content generation via cron</span>
               </label>
               <p class="description">
@@ -155,11 +202,11 @@ $config = \SC_AI\ContentGenerator\Models\ApiConfig::fromOptions();
       <div style="font-size:13px">
         <div style="margin-bottom:8px">
           <strong>Groq:</strong>
-          <?= $config->groq_key ? '<span style="color:green">✓ Configured</span>' : '<span style="color:orange">⚠ Optional</span>' ?>
+          <?= $config['groq_key'] ? '<span style="color:green">✓ Configured</span>' : '<span style="color:orange">⚠ Optional</span>' ?>
         </div>
         <div style="margin-bottom:8px">
           <strong>OpenRouter:</strong>
-          <?= $config->openrouter_key ? '<span style="color:green">✓ Configured</span>' : '<span style="color:orange">⚠ Optional</span>' ?>
+          <?= $config['openrouter_key'] ? '<span style="color:green">✓ Configured</span>' : '<span style="color:orange">⚠ Optional</span>' ?>
         </div>
       </div>
       <div style="margin-top:15px">
@@ -215,172 +262,3 @@ $config = \SC_AI\ContentGenerator\Models\ApiConfig::fromOptions();
   </div>
 </div>
 </div>
-
-<script>
-if (typeof ajaxurl === 'undefined') {
-    ajaxurl = '<?= admin_url( 'admin-ajax.php' ) ?>';
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Test API connection
-    const testApiBtn = document.getElementById('sc-test-api');
-    if (testApiBtn) {
-        testApiBtn.addEventListener('click', function() {
-            const result = document.getElementById('sc-api-test-result');
-            result.style.display = 'block';
-            result.style.background = '#FFF3CD';
-            result.innerHTML = '<strong>Testing API connection...</strong>';
-
-            fetch(ajaxurl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    action: 'sc_ai_test_api',
-                    nonce: '<?= wp_create_nonce( 'sc_ai_nonce' ); ?>',
-                }),
-            })
-            .then( response => {
-                if (!response.ok) {
-                    throw new Error('HTTP ' + response.status + ': ' + response.statusText);
-                }
-                return response.json();
-            })
-            .then( data => {
-                if ( data.success ) {
-                    const r = data.data;
-                    let html = '<strong>API Test Results:</strong><br><br>';
-
-                    if ( r.groq ) {
-                        if ( r.groq.status === 'success' ) {
-                            html += '✅ <strong>Groq:</strong> Connected<br>';
-                        } else if ( r.groq.status === 'not_configured' ) {
-                            html += '⚠ <strong>Groq:</strong> Not configured<br>';
-                        } else if ( r.groq.status === 'rate_limited' ) {
-                            html += '⏳ <strong>Groq:</strong> Rate limited - ' + r.groq.error + '<br>';
-                        } else {
-                            html += '❌ <strong>Groq:</strong> Failed - ' + r.groq.error + '<br>';
-                        }
-                    }
-
-                    if ( r.openrouter ) {
-                        if ( r.openrouter.status === 'success' ) {
-                            html += '✅ <strong>OpenRouter:</strong> Connected';
-                        } else if ( r.openrouter.status === 'not_configured' ) {
-                            html += '⚠ <strong>OpenRouter:</strong> Not configured';
-                        } else if ( r.openrouter.status === 'rate_limited' ) {
-                            html += '⏳ <strong>OpenRouter:</strong> Rate limited - ' + r.openrouter.error;
-                        } else {
-                            html += '❌ <strong>OpenRouter:</strong> Failed - ' + r.openrouter.error;
-                        }
-                    }
-
-                    result.style.background = '#D4EDDA';
-                    result.innerHTML = html;
-                } else {
-                    result.style.background = '#F8D7DA';
-                    result.innerHTML = '<strong>Error:</strong> ' + data.data;
-                }
-            })
-            .catch( err => {
-                result.style.background = '#F8D7DA';
-                result.innerHTML = '<strong>Error:</strong> ' + err.message + '<br><small>Check browser console for details (F12)</small>';
-            });
-        });
-    }
-
-    // Reset stuck questions
-    const resetStuckBtn = document.getElementById('sc-reset-stuck');
-    if (resetStuckBtn) {
-        resetStuckBtn.addEventListener('click', function() {
-            const result = document.getElementById('sc-api-test-result');
-            result.style.display = 'block';
-            result.style.background = '#FFF3CD';
-            result.innerHTML = '<strong>Resetting stuck questions...</strong>';
-
-            fetch(ajaxurl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    action: 'sc_ai_reset_stuck',
-                    nonce: '<?= wp_create_nonce( 'sc_ai_nonce' ); ?>',
-                }),
-            })
-            .then( r => r.json() )
-            .then( data => {
-                if ( data.success ) {
-                    result.style.background = '#D4EDDA';
-                    let msg = '<strong>Reset Complete!</strong><br>';
-                    if ( data.data.locks_cleared ) {
-                        msg += '✅ Cleared batch locks<br>';
-                    }
-                    if ( data.data.reset_count > 0 ) {
-                        msg += '✅ Reset ' + data.data.reset_count + ' stuck questions to pending.';
-                    } else {
-                        msg += 'No stuck questions found.';
-                    }
-                    result.innerHTML = msg;
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    result.style.background = '#F8D7DA';
-                    result.innerHTML = '<strong>Error:</strong> ' + data.data;
-                }
-            })
-            .catch( err => {
-                result.style.background = '#F8D7DA';
-                result.innerHTML = '<strong>Error:</strong> ' + err.message;
-            });
-        });
-    }
-
-    // Manual cron trigger
-    const cronBtn = document.getElementById('sc-manual-cron');
-    if (cronBtn) {
-        cronBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const result = document.getElementById('sc-api-test-result');
-            if (!result) {
-                alert('Result element not found');
-                return;
-            }
-            result.style.display = 'block';
-            result.style.background = '#FFF3CD';
-            result.innerHTML = '<strong>Running final cron job...</strong>';
-
-            fetch(ajaxurl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: new URLSearchParams({
-                    action: 'sc_ai_manual_cron',
-                    nonce: '<?= wp_create_nonce( 'sc_ai_nonce' ); ?>',
-                }),
-            })
-            .then( response => {
-                if (!response.ok) {
-                    throw new Error('HTTP ' + response.status + ': ' + response.statusText);
-                }
-                return response.json();
-            })
-            .then( data => {
-                if ( data.success ) {
-                    result.style.background = '#D4EDDA';
-                    let msg = '<strong>Cron Job Complete!</strong><br>';
-                    msg += '✅ Processed: ' + data.data.processed + '<br>';
-                    msg += '✅ Success: ' + data.data.success + '<br>';
-                    if ( data.data.failed > 0 ) {
-                        msg += '❌ Failed: ' + data.data.failed;
-                    }
-                    result.innerHTML = msg;
-                } else {
-                    result.style.background = '#F8D7DA';
-                    result.innerHTML = '<strong>Error:</strong> ' + (data.data || 'Unknown error');
-                }
-            })
-            .catch( err => {
-                result.style.background = '#F8D7DA';
-                result.innerHTML = '<strong>Error:</strong> ' + err.message + '<br><small>Check browser console for details (F12)</small>';
-            });
-        });
-    }
-});
-</script>

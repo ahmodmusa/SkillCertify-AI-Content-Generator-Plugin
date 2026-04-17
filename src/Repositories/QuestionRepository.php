@@ -18,31 +18,33 @@ class QuestionRepository {
             return $cached;
         }
 
-        // Single meta query instead of multiple calls
-        $all_meta = get_post_meta( $question_id );
-        $correct_answer = $all_meta['correct_answer'][0] ?? '';
-        $explanation = $all_meta['explanation'][0] ?? '';
+        // Get meta values with correct _scp_ prefix
+        $correct_answer = get_post_meta( $question_id, '_scp_correct_answer', true );
+        $explanation = get_post_meta( $question_id, '_scp_explanation', true );
+        // Fallback to post_content if explanation meta is empty
+        if ( empty( $explanation ) ) {
+            $explanation = get_post_field( 'post_content', $question_id );
+        }
+
         $options = [
-            'a' => $all_meta['option_a'][0] ?? '',
-            'b' => $all_meta['option_b'][0] ?? '',
-            'c' => $all_meta['option_c'][0] ?? '',
-            'd' => $all_meta['option_d'][0] ?? '',
+            'a' => get_post_meta( $question_id, '_scp_option_a', true ),
+            'b' => get_post_meta( $question_id, '_scp_option_b', true ),
+            'c' => get_post_meta( $question_id, '_scp_option_c', true ),
+            'd' => get_post_meta( $question_id, '_scp_option_d', true ),
         ];
 
-        $terms = get_the_terms( $question_id, 'scp_category' );
-        $category_name = $terms && ! is_wp_error( $terms ) ? $terms[0]->name : '';
-
-        $exam_terms = get_the_terms( $question_id, 'scp_exam' );
-        $exam_name = $exam_terms && ! is_wp_error( $exam_terms ) ? $exam_terms[0]->name : '';
-
-        $existing_content = get_post_field( 'post_content', $question_id );
+        $category_name = $this->getPrimaryTerm( $question_id, 'scp_category' );
+        $difficulty = get_post_meta( $question_id, '_scp_difficulty', true );
+        $exam_name = $this->buildExamName( $question_id );
+        $existing_content = get_post_meta( $question_id, '_scp_ai_description', true );
 
         $data = [
-            'title' => $post->post_title,
+            'title' => get_the_title( $question_id ),
             'correct_answer' => $correct_answer,
             'explanation' => $explanation,
             'options' => $options,
             'category_name' => $category_name,
+            'difficulty' => $difficulty,
             'exam_name' => $exam_name,
             'existing_content' => $existing_content,
         ];
@@ -53,44 +55,46 @@ class QuestionRepository {
         return $data;
     }
 
-    public function getPendingQuestions( int $limit, string $stage = 'draft' ): array {
+    private function getPrimaryTerm( int $post_id, string $taxonomy ): string {
+        $terms = get_the_terms( $post_id, $taxonomy );
+        if ( is_array( $terms ) && ! empty( $terms ) ) {
+            return $terms[0]->name;
+        }
+        return '';
+    }
+
+    private function buildExamName( int $post_id ): string {
+        $category = $this->getPrimaryTerm( $post_id, 'scp_category' );
+        $difficulty = get_post_meta( $post_id, '_scp_difficulty', true );
+
+        if ( $category && $difficulty ) {
+            return $category . ' — ' . ucfirst( $difficulty ) . ' Level';
+        }
+        if ( $category ) {
+            return $category;
+        }
+        return 'Certification Exam';
+    }
+
+    public function clearCache( int $post_id ): void {
+        delete_transient( 'scp_q_data_' . $post_id );
+    }
+
+    public function getPendingQuestions( int $limit, string $stage = 'none' ): array {
         global $wpdb;
-        $progress_table = $wpdb->prefix . SC_AI_PROGRESS_TABLE;
         $posts_table = $wpdb->posts;
 
-        if ( $stage === 'draft' ) {
-            return $wpdb->get_results( $wpdb->prepare( "
-                SELECT p.ID as question_id
-                FROM {$posts_table} p
-                LEFT JOIN {$progress_table} pr ON p.ID = pr.question_id
-                LEFT JOIN {$wpdb->postmeta} m ON p.ID = m.post_id AND m.meta_key = '_scp_description_draft'
-                WHERE p.post_type = 'scp_question' 
-                AND p.post_status = 'publish'
-                AND (pr.content_stage = 'none' OR pr.content_stage IS NULL OR pr.content_stage = 'draft')
-                AND (m.meta_id IS NULL OR m.meta_value = '' OR (pr.status = 'failed' AND pr.attempts < 3))
-                ORDER BY p.ID ASC
-                LIMIT %d
-            ", $limit ) );
-        } elseif ( $stage === 'final' ) {
-            return $wpdb->get_results( $wpdb->prepare( "
-                SELECT p.ID as question_id
-                FROM {$posts_table} p
-                LEFT JOIN {$progress_table} pr ON p.ID = pr.question_id
-                LEFT JOIN {$wpdb->postmeta} m ON p.ID = m.post_id AND m.meta_key = '_scp_description_draft'
-                LEFT JOIN {$wpdb->postmeta} m2 ON p.ID = m2.post_id AND m2.meta_key = '_scp_description_final'
-                WHERE p.post_type = 'scp_question' 
-                AND p.post_status = 'publish'
-                AND pr.content_stage = 'draft'
-                AND pr.status = 'done'
-                AND m.meta_value IS NOT NULL 
-                AND m.meta_value != ''
-                AND (m2.meta_id IS NULL OR m2.meta_value = '' OR (pr.status = 'failed' AND pr.attempts < 3))
-                ORDER BY p.ID ASC
-                LIMIT %d
-            ", $limit ) );
-        }
-
-        return [];
+        // Get questions without AI content
+        return $wpdb->get_results( $wpdb->prepare( "
+            SELECT p.ID as question_id
+            FROM {$posts_table} p
+            LEFT JOIN {$wpdb->postmeta} m ON p.ID = m.post_id AND m.meta_key = '_scp_ai_description'
+            WHERE p.post_type = 'scp_question' 
+            AND p.post_status = 'publish'
+            AND (m.meta_id IS NULL OR m.meta_value = '')
+            ORDER BY p.ID ASC
+            LIMIT %d
+        ", $limit ) );
     }
 
     public function getTotalQuestionsCount(): int {

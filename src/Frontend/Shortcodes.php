@@ -14,19 +14,10 @@ class Shortcodes {
     public static function renderDescription( $atts ): string {
         $atts = shortcode_atts( [
             'post_id' => get_the_ID(),
-            'stage' => 'final', // draft, final, or auto
         ], $atts );
 
         $post_id = (int) $atts['post_id'];
-        $stage = $atts['stage'];
-
-        if ( $stage === 'auto' ) {
-            $content = TemplateFunctions::getUnifiedDescription( $post_id );
-        } elseif ( $stage === 'draft' ) {
-            $content = TemplateFunctions::getAiDescriptionDraft( $post_id );
-        } else {
-            $content = TemplateFunctions::getAiDescriptionFinal( $post_id );
-        }
+        $content = TemplateFunctions::getUnifiedDescription( $post_id );
 
         return $content ? '<div class="sc-ai-description">' . $content . '</div>' : '';
     }
@@ -34,19 +25,10 @@ class Shortcodes {
     public static function renderFaqs( $atts ): string {
         $atts = shortcode_atts( [
             'post_id' => get_the_ID(),
-            'stage' => 'final',
         ], $atts );
 
         $post_id = (int) $atts['post_id'];
-        $stage = $atts['stage'];
-
-        if ( $stage === 'auto' ) {
-            $faqs = TemplateFunctions::getUnifiedFaqs( $post_id );
-        } elseif ( $stage === 'draft' ) {
-            $faqs = TemplateFunctions::getAiFaqsDraft( $post_id );
-        } else {
-            $faqs = TemplateFunctions::getAiFaqsFinal( $post_id );
-        }
+        $faqs = TemplateFunctions::getUnifiedFaqs( $post_id );
 
         if ( empty( $faqs ) ) {
             return '';

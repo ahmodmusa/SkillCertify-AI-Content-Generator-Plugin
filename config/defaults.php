@@ -12,14 +12,13 @@ return [
     'openrouter_key' => '',
     
     // Model Settings
-    'groq_model' => 'llama-3.1-8b-instant',
+    'groq_model' => 'llama-3.3-70b-versatile',
+    'groq_max_tokens' => 4000,
+    'groq_batch_model' => 'llama-3.1-8b-instant',
     'openrouter_model' => 'openai/gpt-3.5-turbo',
     
     // Queue Settings
-    'enable_draft_queue' => '0', // 1 = use draft queue, 0 = direct publish (default changed to 0)
-    'draft_batch_size' => 25,
     'final_batch_size' => 20,
-    'draft_cron_interval' => 'hourly',
     'final_cron_time' => '04:00',
     'enable_cron' => '1',
     

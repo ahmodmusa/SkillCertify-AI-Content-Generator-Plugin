@@ -24,6 +24,8 @@ class GroqProvider implements ApiProviderInterface {
         $start_time = microtime( true );
         $timestamp = current_time( 'mysql' );
 
+        $max_tokens = intval( get_option( 'sc_ai_groq_max_tokens', 4000 ) );
+
         $response = wp_remote_post( 'https://api.groq.com/openai/v1/chat/completions', [
             'headers' => [
                 'Content-Type'  => 'application/json',
@@ -36,7 +38,7 @@ class GroqProvider implements ApiProviderInterface {
                     'content' => $prompt,
                 ] ],
                 'temperature' => 0.3,
-                'max_tokens'  => 1024,
+                'max_tokens'  => $max_tokens,
             ] ),
             'timeout' => $this->timeout,
         ] );

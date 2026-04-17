@@ -45,68 +45,33 @@ class TemplateFunctions {
     }
 
     public static function getAiDescription( int $post_id ): string {
-        return get_post_meta( $post_id, '_scp_description', true ) ?: '';
-    }
-
-    public static function getAiDescriptionDraft( int $post_id ): string {
-        return get_post_meta( $post_id, '_scp_description_draft', true ) ?: '';
-    }
-
-    public static function getAiDescriptionFinal( int $post_id ): string {
         $cache_key = 'scp_content_' . $post_id;
         $cached = get_transient( $cache_key );
         if ( $cached !== false ) {
             return $cached;
         }
 
-        $content = get_post_meta( $post_id, '_scp_description_final', true ) ?: '';
+        $content = get_post_meta( $post_id, '_scp_ai_description', true ) ?: '';
         set_transient( $cache_key, $content, HOUR_IN_SECONDS );
         return $content;
     }
 
     public static function getAiFaqs( int $post_id ): array {
-        $faqs = get_post_meta( $post_id, '_scp_faqs', true );
-
-        if ( empty( $faqs ) ) {
-            return [];
-        }
-
-        if ( is_string( $faqs ) ) {
-            $faqs = json_decode( $faqs, true );
-        }
-
-        return is_array( $faqs ) ? $faqs : [];
-    }
-
-    public static function getAiFaqsDraft( int $post_id ): array {
-        $faqs = get_post_meta( $post_id, '_scp_faqs_draft', true );
-
-        if ( empty( $faqs ) ) {
-            return [];
-        }
-
-        if ( is_string( $faqs ) ) {
-            $faqs = json_decode( $faqs, true );
-        }
-
-        return is_array( $faqs ) ? $faqs : [];
-    }
-
-    public static function getAiFaqsFinal( int $post_id ): array {
         $cache_key = 'scp_faqs_final_' . $post_id;
         $cached = get_transient( $cache_key );
         if ( $cached !== false ) {
             return $cached;
         }
 
-        $faqs = get_post_meta( $post_id, '_scp_faqs_final', true );
+        $faqs_raw = get_post_meta( $post_id, '_scp_ai_faqs', true );
 
-        if ( empty( $faqs ) ) {
+        if ( empty( $faqs_raw ) ) {
             return [];
         }
 
-        if ( is_string( $faqs ) ) {
-            $faqs = json_decode( $faqs, true );
+        $faqs = json_decode( $faqs_raw, true );
+        if ( ! is_array( $faqs ) ) {
+            $faqs = [];
         }
 
         $result = is_array( $faqs ) ? $faqs : [];
@@ -115,21 +80,15 @@ class TemplateFunctions {
     }
 
     public static function hasAiContent( int $post_id ): bool {
-        $description = get_post_meta( $post_id, '_scp_description', true );
-        $faqs = get_post_meta( $post_id, '_scp_faqs', true );
+        $description = get_post_meta( $post_id, '_scp_ai_description', true );
+        $faqs = get_post_meta( $post_id, '_scp_ai_faqs', true );
         $tip = get_post_meta( $post_id, '_scp_ai_exam_tip', true );
         return ! empty( $description ) || ! empty( $faqs ) || ! empty( $tip );
     }
 
-    public static function hasDraftContent( int $post_id ): bool {
-        $description = get_post_meta( $post_id, '_scp_description_draft', true );
-        $faqs = get_post_meta( $post_id, '_scp_faqs_draft', true );
-        return ! empty( $description ) || ! empty( $faqs );
-    }
-
-    public static function hasFinalContent( int $post_id ): bool {
-        $description = get_post_meta( $post_id, '_scp_description_final', true );
-        $faqs = get_post_meta( $post_id, '_scp_faqs_final', true );
+    public static function hasContent( int $post_id ): bool {
+        $description = get_post_meta( $post_id, '_scp_ai_description', true );
+        $faqs = get_post_meta( $post_id, '_scp_ai_faqs', true );
         return ! empty( $description ) || ! empty( $faqs );
     }
 
@@ -147,24 +106,13 @@ class TemplateFunctions {
             'source' => 'none',
         ];
 
-        // Try final content first
-        $final_desc = get_post_meta( $post_id, '_scp_description_final', true );
-        if ( ! empty( $final_desc ) ) {
-            $result['description'] = $final_desc;
-            $result['faqs'] = self::getAiFaqsFinal( $post_id );
+        // Try new content first
+        $desc = get_post_meta( $post_id, '_scp_ai_description', true );
+        if ( ! empty( $desc ) ) {
+            $result['description'] = $desc;
+            $result['faqs'] = self::getAiFaqs( $post_id );
             $result['exam_tip'] = get_post_meta( $post_id, '_scp_ai_exam_tip', true ) ?: '';
-            $result['source'] = 'final';
-            set_transient( $cache_key, $result, SC_AI_CACHE_TIME_CONTENT );
-            return $result;
-        }
-
-        // Try draft content
-        $draft_desc = get_post_meta( $post_id, '_scp_description_draft', true );
-        if ( ! empty( $draft_desc ) ) {
-            $result['description'] = $draft_desc;
-            $result['faqs'] = self::getAiFaqsDraft( $post_id );
-            $result['exam_tip'] = get_post_meta( $post_id, '_scp_ai_exam_tip', true ) ?: '';
-            $result['source'] = 'draft';
+            $result['source'] = 'ai';
             set_transient( $cache_key, $result, SC_AI_CACHE_TIME_CONTENT );
             return $result;
         }
@@ -173,7 +121,11 @@ class TemplateFunctions {
         $legacy_desc = get_post_meta( $post_id, '_scp_description', true );
         if ( ! empty( $legacy_desc ) ) {
             $result['description'] = $legacy_desc;
-            $result['faqs'] = self::getAiFaqs( $post_id );
+            $result['faqs'] = get_post_meta( $post_id, '_scp_faqs', true );
+            if ( is_string( $result['faqs'] ) ) {
+                $result['faqs'] = json_decode( $result['faqs'], true );
+            }
+            $result['faqs'] = is_array( $result['faqs'] ) ? $result['faqs'] : [];
             $result['exam_tip'] = get_post_meta( $post_id, '_scp_ai_exam_tip', true ) ?: '';
             $result['source'] = 'legacy';
             set_transient( $cache_key, $result, SC_AI_CACHE_TIME_CONTENT );

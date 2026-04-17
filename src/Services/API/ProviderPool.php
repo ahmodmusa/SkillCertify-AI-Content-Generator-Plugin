@@ -22,20 +22,29 @@ class ProviderPool {
         $this->fallback_provider = $fallback_provider;
     }
 
-    public function generate( string $prompt ): string|false {
+    /**
+     * Generate content using available providers
+     *
+     * @param string $prompt The prompt to send to the AI
+     * @return array|false Array with 'content' and 'provider_used' keys, or false on failure
+     */
+    public function generate( string $prompt ): array|false {
         // Try primary provider first
         if ( isset( $this->providers[ $this->primary_provider ] ) ) {
             $provider = $this->providers[ $this->primary_provider ];
-            
+
             if ( ! $this->circuit_breaker->isOpen( $provider->getName() ) ) {
                 error_log( "[SC AI] Trying primary provider: {$provider->getName()}" );
                 $result = $provider->generate( $prompt );
-                
+
                 if ( $result !== false && $result !== 'RATE_LIMITED' ) {
                     $this->circuit_breaker->recordSuccess( $provider->getName() );
-                    return $result;
+                    return [
+                        'content' => $result,
+                        'provider_used' => $provider->getName(),
+                    ];
                 }
-                
+
                 if ( $result === 'RATE_LIMITED' ) {
                     error_log( "[SC AI] Primary provider rate limited" );
                 } else {
@@ -49,16 +58,19 @@ class ProviderPool {
         // Try fallback provider
         if ( $this->fallback_provider && isset( $this->providers[ $this->fallback_provider ] ) ) {
             $provider = $this->providers[ $this->fallback_provider ];
-            
+
             if ( ! $this->circuit_breaker->isOpen( $provider->getName() ) ) {
                 error_log( "[SC AI] Trying fallback provider: {$provider->getName()}" );
                 $result = $provider->generate( $prompt );
-                
+
                 if ( $result !== false && $result !== 'RATE_LIMITED' ) {
                     $this->circuit_breaker->recordSuccess( $provider->getName() );
-                    return $result;
+                    return [
+                        'content' => $result,
+                        'provider_used' => $provider->getName(),
+                    ];
                 }
-                
+
                 if ( $result === 'RATE_LIMITED' ) {
                     error_log( "[SC AI] Fallback provider rate limited" );
                 } else {
@@ -74,16 +86,19 @@ class ProviderPool {
             if ( $name === $this->primary_provider || $name === $this->fallback_provider ) {
                 continue;
             }
-            
+
             if ( ! $this->circuit_breaker->isOpen( $provider->getName() ) ) {
                 error_log( "[SC AI] Trying alternative provider: {$provider->getName()}" );
                 $result = $provider->generate( $prompt );
-                
+
                 if ( $result !== false && $result !== 'RATE_LIMITED' ) {
                     $this->circuit_breaker->recordSuccess( $provider->getName() );
-                    return $result;
+                    return [
+                        'content' => $result,
+                        'provider_used' => $provider->getName(),
+                    ];
                 }
-                
+
                 $this->circuit_breaker->recordFailure( $provider->getName() );
             }
         }

@@ -80,3 +80,55 @@
     font-size: 22px;
     color: #1d2327;
 }
+
+/* Responsive styles */
+@media (max-width: 768px) {
+    .sc-ai-dashboard-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .sc-ai-card {
+        padding: 15px !important;
+    }
+    .sc-ai-card h3 {
+        font-size: 12px !important;
+    }
+    .sc-ai-card > div[style*="font-size: 48px"] {
+        font-size: 32px !important;
+    }
+    .sc-ai-table-container {
+        overflow-x: auto !important;
+    }
+    .sc-ai-status-table {
+        font-size: 12px !important;
+    }
+    .sc-ai-status-table th,
+    .sc-ai-status-table td {
+        padding: 6px 4px !important;
+    }
+    .sc-ai-status-table td:nth-child(2) {
+        min-width: 200px !important;
+    }
+    .sc-ai-pagination {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+    }
+    .sc-ai-filter {
+        font-size: 12px !important;
+        padding: 6px 12px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .sc-ai-status-table td:nth-child(2) {
+        min-width: 150px !important;
+    }
+    .sc-ai-status-table th:nth-child(3),
+    .sc-ai-status-table th:nth-child(4),
+    .sc-ai-status-table th:nth-child(5),
+    .sc-ai-status-table td:nth-child(3),
+    .sc-ai-status-table td:nth-child(4),
+    .sc-ai-status-table td:nth-child(5) {
+        width: auto !important;
+        min-width: 60px !important;
+    }
+}

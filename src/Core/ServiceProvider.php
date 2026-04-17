@@ -18,6 +18,7 @@ class ServiceProvider {
         $this->registerStorageServices();
         $this->registerRepositories();
         $this->registerAdminServices();
+        $this->registerControllers();
     }
 
     private function registerCoreServices(): void {
@@ -27,8 +28,6 @@ class ServiceProvider {
                 'groq_key' => get_option( 'sc_ai_groq_key', '' ),
                 'openrouter_key' => get_option( 'sc_ai_openrouter_key', '' ),
                 'primary_provider' => get_option( 'sc_ai_primary_provider', 'groq' ),
-                'enable_draft_queue' => get_option( 'sc_ai_enable_draft_queue', '1' ),
-                'draft_batch_size' => get_option( 'sc_ai_draft_batch_size', 25 ),
                 'final_batch_size' => get_option( 'sc_ai_final_batch_size', 20 ),
                 'enable_cron' => get_option( 'sc_ai_enable_cron', '1' ),
             ] );
@@ -92,61 +91,54 @@ class ServiceProvider {
             return new \SC_AI\ContentGenerator\Services\Queue\QueueManager();
         });
 
-        // Draft queue removed - using direct generation instead
-
         $this->singleton( 'queue.final', function() {
             return new \SC_AI\ContentGenerator\Services\Queue\FinalQueue(
                 $this->get( 'queue.manager' ),
-                $this->get( 'generator.final' )
+                $this->get( 'generator' )
             );
         });
 
         $this->singleton( 'queue.retry', function() {
             return new \SC_AI\ContentGenerator\Services\Queue\RetryQueue(
                 $this->get( 'queue.manager' ),
-                $this->get( 'generator.final' )
+                $this->get( 'generator' )
             );
         });
     }
 
     private function registerGeneratorServices(): void {
-        $this->bind( 'prompt.draft', function() {
-            return new \SC_AI\ContentGenerator\Services\Prompt\DraftPromptBuilder();
+        $this->bind( 'prompt', function() {
+            return new \SC_AI\ContentGenerator\Services\Prompt\PromptBuilder();
         });
 
-        $this->bind( 'prompt.final', function() {
-            return new \SC_AI\ContentGenerator\Services\Prompt\FinalPromptBuilder();
-        });
-
-        $this->singleton( 'parser', function() {
+        $this->bind( 'parser', function() {
             return new \SC_AI\ContentGenerator\Services\Parser\StructuredParser();
         });
 
-        $this->bind( 'generator.draft', function() {
-            return new \SC_AI\ContentGenerator\Services\Generator\DraftGenerator(
-                $this->get( 'api.pool' ),
-                $this->get( 'prompt.draft' ),
-                $this->get( 'parser' ),
-                $this->get( 'storage.content' ),
-                $this->get( 'storage.progress' )
+        $this->singleton( 'storage.content', function() {
+            return new \SC_AI\ContentGenerator\Services\Storage\ContentStorage();
+        });
+
+        $this->singleton( 'storage.progress', function() {
+            return new \SC_AI\ContentGenerator\Services\Storage\ProgressTracker(
+                $this->get( 'repository.progress' )
             );
         });
 
-        $this->bind( 'generator.final', function() {
+        $this->singleton( 'generator', function() {
             return new \SC_AI\ContentGenerator\Services\Generator\FinalGenerator(
                 $this->get( 'api.pool' ),
-                $this->get( 'prompt.final' ),
+                $this->get( 'prompt' ),
                 $this->get( 'parser' ),
                 $this->get( 'storage.content' ),
-                $this->get( 'storage.progress' )
+                $this->get( 'storage.progress' ),
+                $this->get( 'repository.question' )
             );
         });
 
         $this->singleton( 'generator.service', function() {
             return new \SC_AI\ContentGenerator\Services\Generator\GeneratorService(
-                $this->get( 'generator.draft' ),
-                $this->get( 'generator.final' ),
-                null, // queue.draft removed
+                $this->get( 'generator' ),
                 $this->get( 'queue.final' ),
                 $this->get( 'queue.retry' )
             );
@@ -154,12 +146,10 @@ class ServiceProvider {
     }
 
     private function registerStorageServices(): void {
-        $this->singleton( 'storage.content', function() {
-            return new \SC_AI\ContentGenerator\Services\Storage\ContentStorage();
-        });
-
         $this->singleton( 'storage.progress', function() {
-            return new \SC_AI\ContentGenerator\Services\Storage\ProgressTracker();
+            return new \SC_AI\ContentGenerator\Services\Storage\ProgressTracker(
+                $this->get( 'repository.progress' )
+            );
         });
     }
 
@@ -197,6 +187,18 @@ class ServiceProvider {
         });
     }
 
+    private function registerControllers(): void {
+        $this->singleton( 'controller.queue', function() {
+            return new \SC_AI\ContentGenerator\Controllers\QueueController( $this );
+        });
+
+        $this->singleton( 'controller.question_column', function() {
+            return new \SC_AI\ContentGenerator\Controllers\QuestionColumnController(
+                $this->get( 'repository.progress' )
+            );
+        });
+    }
+
     public function boot(): void {
         if ( $this->booted ) {
             return;
@@ -207,72 +209,13 @@ class ServiceProvider {
         $this->get( 'admin.settings' )->boot();
         $this->get( 'admin.ajax' )->boot();
 
-        // Register queue hooks
-        add_action( SC_AI_FINAL_QUEUE_HOOK, [ $this, 'handleFinalQueue' ] );
-        add_action( SC_AI_RETRY_QUEUE_HOOK, [ $this, 'handleRetryQueue' ] );
+        // Boot queue controller
+        $this->get( 'controller.queue' )->boot();
+
+        // Boot question column controller
+        $this->get( 'controller.question_column' )->boot();
 
         $this->booted = true;
-    }
-
-    public function handleFinalQueue(): void {
-        if ( get_option( 'sc_ai_enable_cron', '1' ) !== '1' ) {
-            error_log( '[SC AI] Final cron disabled, skipping' );
-            return;
-        }
-
-        $batch_size = absint( get_option( 'sc_ai_final_batch_size', 20 ) );
-        $final_queue = $this->get( 'queue.final' );
-        $results = $final_queue->process( $batch_size );
-
-        error_log( sprintf(
-            '[SC AI] Final cron: %d processed, %d success, %d failed',
-            $results['processed'],
-            $results['success'],
-            $results['failed']
-        ) );
-
-        // Log to cron history
-        $this->logCronHistory( 'Final', $results );
-    }
-
-    public function handleRetryQueue(): void {
-        if ( get_option( 'sc_ai_enable_cron', '1' ) !== '1' ) {
-            error_log( '[SC AI] Retry cron disabled, skipping' );
-            return;
-        }
-
-        $retry_queue = $this->get( 'queue.retry' );
-        $results = $retry_queue->process( 10 );
-
-        error_log( sprintf(
-            '[SC AI] Retry cron: %d processed, %d success, %d failed',
-            $results['processed'],
-            $results['success'],
-            $results['failed']
-        ) );
-
-        // Log to cron history
-        $this->logCronHistory( 'Retry', $results );
-    }
-
-    private function logCronHistory( string $type, array $results ): void {
-        $history = get_option( 'sc_ai_cron_history', [] );
-        $status = $results['failed'] > 0 ? 'failed' : 'success';
-        
-        $entry = [
-            'type' => $type,
-            'status' => $status,
-            'processed' => $results['processed'],
-            'success' => $results['success'],
-            'failed' => $results['failed'],
-            'time' => date( 'M j, g:i A' ),
-        ];
-
-        // Add to beginning and keep only last 50
-        array_unshift( $history, $entry );
-        $history = array_slice( $history, 0, 50 );
-        
-        update_option( 'sc_ai_cron_history', $history );
     }
 
     public function bind( string $key, callable $concrete ): void {

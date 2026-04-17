@@ -13,6 +13,26 @@ class SettingsController {
 
     public function boot(): void {
         add_action( 'admin_init', [ $this, 'handleSettingsSave' ] );
+        add_action( 'admin_enqueue_scripts', [ $this, 'enqueueAssets' ] );
+    }
+
+    public function enqueueAssets( string $hook ): void {
+        if ( $hook !== 'sc-ai-content-generator_page_sc-ai-generator' ) {
+            return;
+        }
+
+        wp_enqueue_script(
+            'sc-ai-admin-settings',
+            SC_AI_PLUGIN_URL . 'assets/js/admin-settings.js',
+            [],
+            SC_AI_VERSION,
+            true
+        );
+
+        wp_localize_script( 'sc-ai-admin-settings', 'scAiSettings', [
+            'nonce' => wp_create_nonce( 'sc_ai_nonce' ),
+            'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+        ] );
     }
 
     public function handleSettingsSave(): void {
@@ -43,6 +63,12 @@ class SettingsController {
         }
         if ( isset( $_POST['groq_model'] ) ) {
             update_option( 'sc_ai_groq_model', sanitize_text_field( $_POST['groq_model'] ) );
+        }
+        if ( isset( $_POST['groq_max_tokens'] ) ) {
+            update_option( 'sc_ai_groq_max_tokens', intval( $_POST['groq_max_tokens'] ?? 4000 ) );
+        }
+        if ( isset( $_POST['groq_batch_model'] ) ) {
+            update_option( 'sc_ai_groq_batch_model', sanitize_text_field( $_POST['groq_batch_model'] ?? 'llama-3.1-8b-instant' ) );
         }
         if ( isset( $_POST['openrouter_model'] ) ) {
             update_option( 'sc_ai_openrouter_model', sanitize_text_field( $_POST['openrouter_model'] ) );

@@ -64,7 +64,7 @@
         let html = '';
         data.questions.forEach(q => {
             let statusBadge = '';
-            if (q.status === 'final' || q.status === 'complete') {
+            if (q.status === 'done' || q.status === 'complete') {
                 statusBadge = '<span style="background: #00a32a; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px;">COMPLETE</span>';
             } else {
                 statusBadge = '<span style="background: #646970; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 11px;">PENDING</span>';
@@ -77,7 +77,7 @@
             html += '<td style="padding: 8px; border-bottom: 1px solid #e5e5e5; font-size: 12px; color: #646970; width: 110px;">' + (q.generated_time || '—') + '</td>';
             html += '<td style="padding: 8px; border-bottom: 1px solid #e5e5e5; width: 100px;">';
             if (q.status === 'none' || q.status === 'pending') {
-                html += '<button class="button button-small sc-ai-gen-draft" data-id="' + q.id + '" style="font-size: 11px; padding: 3px 8px;">✨ Generate</button>';
+                html += '<button class="button button-small sc-ai-gen" data-id="' + q.id + '" style="font-size: 11px; padding: 3px 8px;">✨ Generate</button>';
             } else {
                 html += '<span style="color: #00a32a; font-size: 11px;">✓ Done</span>';
             }
@@ -92,9 +92,9 @@
         scAiRenderPagination(scAiCurrentPage, totalPages, data.total);
 
         // Add action listeners
-        document.querySelectorAll('.sc-ai-gen-draft').forEach(btn => {
+        document.querySelectorAll('.sc-ai-gen').forEach(btn => {
             btn.addEventListener('click', function() {
-                scAiGenerateDraft(this.dataset.id);
+                scAiGenerate(this.dataset.id);
             });
         });
 
@@ -212,7 +212,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: new URLSearchParams({
-                        action: 'sc_ai_draft_batch_manual',
+                        action: 'sc_ai_final_batch_manual',
                         nonce: scAiNonce,
                         batch: questionIds.length,
                     }),
@@ -337,9 +337,9 @@
     }
 
     /**
-     * Generate draft for single question
+     * Generate content for single question
      */
-    function scAiGenerateDraft(postId) {
+    function scAiGenerate(postId) {
         scAiShowModal({
             title: 'Generate Content',
             message: 'Generate AI content for this question?',
@@ -349,7 +349,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: new URLSearchParams({
-                        action: 'sc_ai_generate_draft',
+                        action: 'sc_ai_generate',
                         nonce: scAiNonce,
                         post_id: postId,
                     }),
@@ -368,42 +368,8 @@
         });
     }
 
-    /**
-     * Generate final for single question
-     */
-    function scAiGenerateFinal(postId) {
-        postId = postId || 0;
-        scAiShowModal({
-            title: 'Generate Final',
-            message: 'Generate final polished content for this question?',
-            confirmText: 'Generate',
-            onConfirm: () => {
-                fetch(scAiAjaxUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({
-                        action: 'sc_ai_generate_final',
-                        nonce: scAiNonce,
-                        post_id: postId,
-                    }),
-                })
-                .then(r => r.json())
-                .then(response => {
-                    if (response.success && response.data.success) {
-                        scAiShowToast('Final generated successfully!', 'success');
-                        scAiLoadTable(scAiCurrentPage, scAiCurrentFilter);
-                    } else {
-                        scAiShowToast('Error: ' + (response.data.error || response.data || 'Unknown error'), 'error');
-                    }
-                })
-                .catch(err => scAiShowToast('Error: ' + err.message, 'error'));
-            }
-        });
-    }
-
     // Make functions globally accessible for inline onclick handlers
-    window.scAiGenerateFinal = scAiGenerateFinal;
-    window.scAiGenerateDraft = scAiGenerateDraft;
+    window.scAiGenerate = scAiGenerate;
 
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
