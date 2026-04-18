@@ -17,7 +17,7 @@ class SettingsController {
     }
 
     public function enqueueAssets( string $hook ): void {
-        if ( $hook !== 'sc-ai-content-generator_page_sc-ai-generator' ) {
+        if ( $hook !== 'ai-dashboard_page_sc-ai-generator' ) {
             return;
         }
 

@@ -2,6 +2,11 @@
 
 All notable changes to the SC AI Content Generator plugin will be documented in this file.
 
+## [1.0.3] - 2026-04-18
+
+### Bug Fixes
+- Fixed admin page hook from 'sc-ai-content-generator_page_sc-ai-generator' to 'ai-dashboard_page_sc-ai-generator' for proper asset loading
+
 ## [1.0.1] - 2026-04-16
 
 ### Major Changes
