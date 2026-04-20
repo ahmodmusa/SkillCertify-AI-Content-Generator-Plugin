@@ -6,6 +6,7 @@ return [
     // API Settings
     'primary_provider' => 'groq',
     'fallback_provider' => 'openrouter',
+    'batch_provider' => 'groq',
     
     // API Keys
     'groq_key' => '',
@@ -20,6 +21,7 @@ return [
     
     // Queue Settings
     'final_batch_size' => 20,
+    'manual_batch_size' => 5,
     'final_cron_time' => '04:00',
     'enable_cron' => '1',
     

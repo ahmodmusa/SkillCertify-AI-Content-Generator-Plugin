@@ -4,6 +4,7 @@ defined( 'ABSPATH' ) || exit;
 $config = [
     'primary_provider' => get_option( 'sc_ai_primary_provider', 'groq' ),
     'fallback_provider' => get_option( 'sc_ai_fallback_provider', 'openrouter' ),
+    'batch_provider' => get_option( 'sc_ai_batch_provider', 'groq' ),
     'groq_key' => get_option( 'sc_ai_groq_key', '' ),
     'openrouter_key' => get_option( 'sc_ai_openrouter_key', '' ),
     'groq_model' => get_option( 'sc_ai_groq_model', 'llama-3.1-8b-instant' ),
@@ -12,6 +13,7 @@ $config = [
     'openrouter_model' => get_option( 'sc_ai_openrouter_model', 'openai/gpt-3.5-turbo' ),
     'openrouter_max_tokens' => get_option( 'sc_ai_openrouter_max_tokens', 500 ),
     'final_batch_size' => get_option( 'sc_ai_final_batch_size', 20 ),
+    'manual_batch_size' => get_option( 'sc_ai_manual_batch_size', 5 ),
     'final_cron_time' => get_option( 'sc_ai_final_cron_time', '04:00' ),
     'enable_cron' => get_option( 'sc_ai_enable_cron', '1' ),
 ];
@@ -51,6 +53,18 @@ $config = [
               </select>
               <p class="description">
                 Fallback API if primary fails.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <th>Batch Provider</th>
+            <td>
+              <select name="batch_provider" class="regular-text">
+                <option value="groq" <?= selected( $config['batch_provider'], 'groq' ) ?>>Groq (Fast, 30 req/min)</option>
+                <option value="openrouter" <?= selected( $config['batch_provider'], 'openrouter' ) ?>>OpenRouter (Multi-model)</option>
+              </select>
+              <p class="description">
+                API to use for batch/cron jobs. Use Groq for speed, OpenRouter for quality.
               </p>
             </td>
           </tr>
@@ -184,13 +198,24 @@ $config = [
         <?php wp_nonce_field( 'sc_ai_settings' ) ?>
         <table class="form-table">
           <tr>
-            <th>Batch Size</th>
+            <th>Batch Size (Cron)</th>
             <td>
               <input type="number" name="final_batch_size" class="small-text"
                      value="<?= esc_attr( $config['final_batch_size'] ) ?>"
                      min="1" max="100" style="width:80px">
               <p class="description">
-                Number of questions to process per batch
+                Number of questions to process per cron batch
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <th>Manual Batch Size</th>
+            <td>
+              <input type="number" name="manual_batch_size" class="small-text"
+                     value="<?= esc_attr( $config['manual_batch_size'] ?? 5 ) ?>"
+                     min="1" max="20" style="width:80px">
+              <p class="description">
+                Safe batch size for manual runs (recommended: 5 to avoid rate limits)
               </p>
             </td>
           </tr>
@@ -221,10 +246,10 @@ $config = [
             <th>Manual Cron Trigger</th>
             <td>
               <button id="sc-manual-cron" type="button" class="button button-secondary" style="font-size:13px">
-                ⏰ Run Final Cron Now
+                ⏰ Run Batch (<?= esc_attr( $config['manual_batch_size'] ?? 5 ) ?> questions)
               </button>
               <p class="description">
-                Manually trigger the final content generation cron job
+                Manually trigger batch processing with safe batch size
               </p>
             </td>
           </tr>

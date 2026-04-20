@@ -209,8 +209,8 @@ class AjaxController {
         }
 
         try {
-            // Trigger the final cron job handler
-            $batch_size = absint( get_option( 'sc_ai_final_batch_size', 20 ) );
+            // Use manual batch size for manual runs (safer to avoid rate limits)
+            $batch_size = absint( get_option( 'sc_ai_manual_batch_size', 5 ) );
             $final_queue = $this->service_provider->get( 'queue.final' );
             $results = $final_queue->process( $batch_size );
 
@@ -218,6 +218,7 @@ class AjaxController {
                 'processed' => $results['processed'],
                 'success' => $results['success'],
                 'failed' => $results['failed'],
+                'batch_size' => $batch_size,
             ] );
         } catch ( \Exception $e ) {
             error_log( '[SC AI] Manual cron exception: ' . $e->getMessage() );

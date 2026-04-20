@@ -55,6 +55,9 @@ class SettingsController {
         if ( isset( $_POST['fallback_provider'] ) ) {
             update_option( 'sc_ai_fallback_provider', sanitize_text_field( $_POST['fallback_provider'] ) );
         }
+        if ( isset( $_POST['batch_provider'] ) ) {
+            update_option( 'sc_ai_batch_provider', sanitize_text_field( $_POST['batch_provider'] ) );
+        }
         if ( isset( $_POST['groq_key'] ) ) {
             update_option( 'sc_ai_groq_key', sanitize_text_field( $_POST['groq_key'] ) );
         }
@@ -79,6 +82,7 @@ class SettingsController {
 
         // Queue Settings
         update_option( 'sc_ai_final_batch_size', absint( $_POST['final_batch_size'] ?? 20 ) );
+        update_option( 'sc_ai_manual_batch_size', absint( $_POST['manual_batch_size'] ?? 5 ) );
         update_option( 'sc_ai_final_cron_time', sanitize_text_field( $_POST['final_cron_time'] ?? '04:00' ) );
         update_option( 'sc_ai_enable_cron', isset( $_POST['enable_cron'] ) ? '1' : '0' );
 
