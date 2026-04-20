@@ -213,9 +213,9 @@ $config = [
             <td>
               <input type="number" name="manual_batch_size" class="small-text"
                      value="<?= esc_attr( $config['manual_batch_size'] ?? 5 ) ?>"
-                     min="1" max="20" style="width:80px">
+                     min="1" max="100" style="width:80px">
               <p class="description">
-                Safe batch size for manual runs (recommended: 5 to avoid rate limits)
+                Safe batch size for manual runs (editable, OpenRouter can handle higher batches)
               </p>
             </td>
           </tr>
