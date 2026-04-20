@@ -16,42 +16,46 @@ class ContentStorage {
         'scp_faqs_final_',
         'scp_schema_',
         'scp_unified_content_',
+        'scp_explanation_',
+        'scp_keypoints_',
+        'scp_mistake_',
+        'scp_tip_',
     ];
 
     public function save( int $post_id, array $data ): bool {
+        // Debug: Log data being saved
+        error_log( '[SC AI] Saving data for post ' . $post_id . ': ' . print_r( $data, true ) );
+
+        // Guard: prevent saving if explanation is empty
+        if ( empty( $data['explanation'] ) ) {
+            error_log( '[SC AI] ERROR: Explanation missing for post ' . $post_id );
+            return false;
+        }
+
         $saved = true;
 
-        if ( ! empty( $data['description'] ) ) {
-            $clean_desc = wp_kses_post( $data['description'] );
-            // Decode any HTML-encoded quotes back to real chars
-            $clean_desc = html_entity_decode( $clean_desc, ENT_QUOTES, 'UTF-8' );
-            $saved = update_post_meta( $post_id, '_scp_ai_description', $clean_desc ) && $saved;
-            // Sync to parent plugin key
-            $saved = update_post_meta( $post_id, '_scp_description_final', $clean_desc ) && $saved;
+        // Save explanation to post_content (40-100 words) - use wp_kses_post for HTML
+        $clean_explanation = wp_kses_post( $data['explanation'] );
+        $saved = wp_update_post( [
+            'ID'           => $post_id,
+            'post_content' => $clean_explanation,
+        ], false ) && $saved;
+
+        // Save keypoints (JSON array)
+        if ( ! empty( $data['keypoints'] ) && is_array( $data['keypoints'] ) ) {
+            $clean = array_map( 'sanitize_text_field', $data['keypoints'] );
+            $json = json_encode( $clean, JSON_UNESCAPED_UNICODE );
+            $saved = update_post_meta( $post_id, '_scp_ai_keypoints', $json ) && $saved;
         }
 
-        if ( ! empty( $data['exam_tip'] ) ) {
-            $saved = update_post_meta( $post_id, '_scp_ai_exam_tip', sanitize_text_field( $data['exam_tip'] ) ) && $saved;
+        // Save mistake (1 line)
+        if ( ! empty( $data['mistake'] ) ) {
+            $saved = update_post_meta( $post_id, '_scp_ai_mistake', sanitize_text_field( $data['mistake'] ) ) && $saved;
         }
 
-        // Build FAQ array for storage
-        $faqs = [];
-        for ( $i = 1; $i <= 5; $i++ ) {
-            $q = $data["faq{$i}_q"] ?? '';
-            $a = $data["faq{$i}_a"] ?? '';
-            if ( ! empty( $q ) && ! empty( $a ) ) {
-                $faqs[] = [
-                    'question' => wp_strip_all_tags( $q ),
-                    'answer'   => wp_strip_all_tags( $a ),
-                ];
-            }
-        }
-
-        if ( ! empty( $faqs ) ) {
-            // Use JSON_HEX_QUOT to escape all double quotes as \u0022
-            // This prevents inner quotes from breaking JSON structure
-            $json = json_encode( $faqs, JSON_UNESCAPED_UNICODE | JSON_HEX_QUOT );
-            $saved = update_post_meta( $post_id, '_scp_ai_faqs', $json ) && $saved;
+        // Save tip (1 line)
+        if ( ! empty( $data['tip'] ) ) {
+            $saved = update_post_meta( $post_id, '_scp_ai_tip', sanitize_text_field( $data['tip'] ) ) && $saved;
         }
 
         $this->clearCache( $post_id );
@@ -59,23 +63,27 @@ class ContentStorage {
     }
 
     public function hasContent( int $post_id ): bool {
-        $description = get_post_meta( $post_id, '_scp_ai_description', true );
-        return ! empty( $description );
+        $post = get_post( $post_id );
+        $explanation = $post ? $post->post_content : '';
+        return ! empty( $explanation );
     }
 
     public function getContent( int $post_id ): ?array {
-        $description = get_post_meta( $post_id, '_scp_ai_description', true );
-        if ( empty( $description ) ) {
+        $post = get_post( $post_id );
+        $explanation = $post ? $post->post_content : '';
+        if ( empty( $explanation ) ) {
             return null;
         }
 
-        $faqs_raw = get_post_meta( $post_id, '_scp_ai_faqs', true );
-        $faqs = is_string( $faqs_raw ) ? json_decode( $faqs_raw, true ) : $faqs_raw;
-        $faqs = is_array( $faqs ) ? $faqs : [];
+        $keypoints_raw = get_post_meta( $post_id, '_scp_ai_keypoints', true );
+        $keypoints = is_string( $keypoints_raw ) ? json_decode( $keypoints_raw, true ) : $keypoints_raw;
+        $keypoints = is_array( $keypoints ) ? $keypoints : [];
 
         return [
-            'description' => $description,
-            'faqs' => $faqs,
+            'explanation' => $explanation,
+            'keypoints' => $keypoints,
+            'mistake' => get_post_meta( $post_id, '_scp_ai_mistake', true ),
+            'tip' => get_post_meta( $post_id, '_scp_ai_tip', true ),
         ];
     }
 

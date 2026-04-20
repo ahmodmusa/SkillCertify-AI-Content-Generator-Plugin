@@ -16,42 +16,51 @@ class StructuredParser {
         // Normalize curly quotes to straight quotes
         $output = $this->normalizeQuotes( $output );
 
-        $description = $this->extractSection( $output, 'DESCRIPTION' );
-        $faq1_q      = $this->cleanText( $this->extractSection( $output, 'FAQ_1_QUESTION' ) );
-        $faq1_a      = $this->cleanText( $this->extractFaqAnswerFallback( $output, 1 ) );
-        $faq2_q      = $this->cleanText( $this->extractSection( $output, 'FAQ_2_QUESTION' ) );
-        $faq2_a      = $this->cleanText( $this->extractFaqAnswerFallback( $output, 2 ) );
-        $faq3_q      = $this->cleanText( $this->extractSection( $output, 'FAQ_3_QUESTION' ) );
-        $faq3_a      = $this->cleanText( $this->extractFaqAnswerFallback( $output, 3 ) );
-        $faq4_q      = $this->cleanText( $this->extractSection( $output, 'FAQ_4_QUESTION' ) );
-        $faq4_a      = $this->cleanText( $this->extractFaqAnswerFallback( $output, 4 ) );
-        $faq5_q      = $this->cleanText( $this->extractSection( $output, 'FAQ_5_QUESTION' ) );
-        $faq5_a      = $this->cleanText( $this->extractFaqAnswerFallback( $output, 5 ) );
-        $exam_tip    = $this->cleanText( $this->extractSection( $output, 'EXAM_TIP' ) );
+        // Extract new sections
+        $explanation = $this->extractSection( $output, 'EXPLANATION' );
+        $keypoints_raw = $this->extractSection( $output, 'KEY_POINTS' );
+        $mistake = $this->extractSection( $output, 'COMMON_MISTAKE' );
+        $tip = $this->extractSection( $output, 'EXAM_TIP' );
 
-        // Convert markdown headers to HTML in description
-        $description = preg_replace( '/^## (.+)$/m', '<h2>$1</h2>', $description );
-        $description = preg_replace( '/^# (.+)$/m', '<h1>$1</h1>', $description );
-        $description = preg_replace( '/^\*\*(.+?)\*\*$/m', '<strong>$1</strong>', $description );
+        // Fallback: If no [EXPLANATION] tag, extract content before KEY_POINTS
+        if ( empty( $explanation ) ) {
+            $explanation = $this->extractExplanationFallback( $output );
+            // If still no keypoints with tags, try without tags
+            if ( empty( $keypoints_raw ) ) {
+                $keypoints_raw = $this->extractSectionFallback( $output, 'KEY_POINTS' );
+            }
+            if ( empty( $mistake ) ) {
+                $mistake = $this->extractSectionFallback( $output, 'COMMON_MISTAKE' );
+            }
+            if ( empty( $tip ) ) {
+                $tip = $this->extractSectionFallback( $output, 'EXAM_TIP' );
+            }
+        }
 
-        if ( empty( $description ) ) {
-            error_log( '[SC AI] Parse failed - description empty. Raw output: ' . substr( $output, 0, 500 ) );
+        // Parse keypoints into array
+        $keypoints = [];
+        if ( ! empty( $keypoints_raw ) ) {
+            $lines = explode( "\n", trim( $keypoints_raw ) );
+            foreach ( $lines as $line ) {
+                $line = trim( $line );
+                // Support both "-" and "*" bullets
+                if ( ! empty( $line ) && ( strpos( $line, '-' ) === 0 || strpos( $line, '*' ) === 0 ) ) {
+                    $keypoints[] = trim( substr( $line, 1 ) );
+                }
+            }
+        }
+
+        // Validation - check explanation exists
+        if ( empty( $explanation ) ) {
+            error_log( '[SC AI] Parse failed - explanation empty. Raw output: ' . substr( $output, 0, 500 ) );
             return null;
         }
 
         return [
-            'description' => $description,
-            'faq1_q'      => $faq1_q,
-            'faq1_a'      => $faq1_a,
-            'faq2_q'      => $faq2_q,
-            'faq2_a'      => $faq2_a,
-            'faq3_q'      => $faq3_q,
-            'faq3_a'      => $faq3_a,
-            'faq4_q'      => $faq4_q,
-            'faq4_a'      => $faq4_a,
-            'faq5_q'      => $faq5_q,
-            'faq5_a'      => $faq5_a,
-            'exam_tip'    => $exam_tip,
+            'explanation' => $explanation,
+            'keypoints'   => $keypoints,
+            'mistake'     => $mistake,
+            'tip'         => $tip,
         ];
     }
 
@@ -59,6 +68,25 @@ class StructuredParser {
         // Find content between [TAG] and next [
         $pattern = '/\[' . preg_quote( $tag, '/' ) . '\]\s*(.*?)'
                  . '(?=\[[A-Z_0-9]+\]|$)/s';
+        if ( preg_match( $pattern, $output, $matches ) ) {
+            return trim( $matches[1] );
+        }
+        return '';
+    }
+
+    private function extractExplanationFallback( string $output ): string {
+        // Extract everything before KEY_POINTS (with or without brackets)
+        $pattern = '/^(.*?)\n?\s*(?:\[?KEY_POINTS\]?|\[?KEYPOINTS\]?)/is';
+        if ( preg_match( $pattern, $output, $matches ) ) {
+            return trim( $matches[1] );
+        }
+        return '';
+    }
+
+    private function extractSectionFallback( string $output, string $tag ): string {
+        // Extract content after TAG (without brackets) until next section
+        $tag_upper = strtoupper( $tag );
+        $pattern = '/\n?\s*(?:\[?' . preg_quote( $tag_upper, '/' ) . '\]?)\s*\n(.*?)(?:\n\s*(?:\[?[A-Z_0-9]+\]?|\n)|$)/is';
         if ( preg_match( $pattern, $output, $matches ) ) {
             return trim( $matches[1] );
         }

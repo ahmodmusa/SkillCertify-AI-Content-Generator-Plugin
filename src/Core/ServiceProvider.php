@@ -19,6 +19,7 @@ class ServiceProvider {
         $this->registerRepositories();
         $this->registerAdminServices();
         $this->registerControllers();
+        $this->registerSeoServices();
     }
 
     private function registerCoreServices(): void {
@@ -185,6 +186,10 @@ class ServiceProvider {
                 $this
             );
         });
+
+        $this->singleton( 'admin.ai_content_metabox', function() {
+            return new \SC_AI\ContentGenerator\Admin\AIContentMetaBox();
+        });
     }
 
     private function registerControllers(): void {
@@ -199,6 +204,12 @@ class ServiceProvider {
         });
     }
 
+    private function registerSeoServices(): void {
+        $this->singleton( 'seo.rankmath', function() {
+            return new \SC_AI\ContentGenerator\Services\SEO\RankMathService();
+        });
+    }
+
     public function boot(): void {
         if ( $this->booted ) {
             return;
@@ -208,12 +219,16 @@ class ServiceProvider {
         $this->get( 'admin.dashboard' )->boot();
         $this->get( 'admin.settings' )->boot();
         $this->get( 'admin.ajax' )->boot();
+        $this->get( 'admin.ai_content_metabox' )->boot();
 
         // Boot queue controller
         $this->get( 'controller.queue' )->boot();
 
         // Boot question column controller
         $this->get( 'controller.question_column' )->boot();
+
+        // Boot SEO services
+        $this->get( 'seo.rankmath' )->boot();
 
         $this->booted = true;
     }

@@ -2,6 +2,31 @@
 
 All notable changes to the SC AI Content Generator plugin will be documented in this file.
 
+## [1.0.4] - 2026-04-20
+
+### 🆕 New Features
+- Added AIContentMetaBox for question editing with AI-generated content
+- Added SEO services for RankMath integration
+- Added migrations directory for database schema updates
+- Restructured AI-generated content from FAQ-based to explanation/keypoints/mistake/tip format
+- Added explanation storage in post_content (40-100 words)
+- Added keypoints storage as JSON array (3-5 unique points)
+- Added common mistake storage (1 short sentence)
+- Added exam tip storage (1 short actionable tip)
+
+### 🔧 Code Improvements
+- Updated ContentStorage to save explanation directly to post_content
+- Updated PromptBuilder with new streamlined prompt structure
+- Updated StructuredParser to handle new content fields
+- Improved content generation with question-specific explanations
+- Enhanced storage keys for new content structure
+- Added error logging for missing explanations
+- Added guard to prevent saving empty explanations
+
+### 📝 Template Updates
+- Updated prompt template to focus on specific, question-specific explanations
+- Removed generic FAQ structure in favor of targeted content
+
 ## [1.0.3] - 2026-04-18
 
 ### Bug Fixes

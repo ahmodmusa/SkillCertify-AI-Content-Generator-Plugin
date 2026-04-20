@@ -82,6 +82,9 @@ abstract class AbstractGenerator {
             return $result;
         }
 
+        // Debug: Log AI response
+        error_log( '[SC AI] AI RESPONSE: ' . print_r( $generated, true ) );
+
         // Capture which provider was used
         $result['provider_used'] = $generated['provider_used'];
 
@@ -92,6 +95,9 @@ abstract class AbstractGenerator {
             $result['error'] = 'Failed to parse AI output';
             return $result;
         }
+
+        // Debug: Log parsed output
+        error_log( '[SC AI] PARSED: ' . print_r( $parsed, true ) );
 
         // Save content
         $saved = $this->saveContent( $question_id, $parsed );

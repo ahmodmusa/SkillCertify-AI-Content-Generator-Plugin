@@ -51,11 +51,20 @@ class AjaxController {
             delete_post_meta($post_id, '_scp_ai_exam_tip');
             delete_post_meta($post_id, '_scp_description_final');
             delete_post_meta($post_id, '_scp_faqs_final');
-            
+            // Delete new meta keys
+            delete_post_meta($post_id, '_scp_ai_keypoints');
+            delete_post_meta($post_id, '_scp_ai_mistake');
+            delete_post_meta($post_id, '_scp_ai_tip');
+            // Clear post_content (explanation is now stored here)
+            wp_update_post([
+                'ID'           => $post_id,
+                'post_content' => '',
+            ], false);
+
             // Reset progress so generator runs fresh
             $progress_repo = $this->service_provider->get('repository.progress');
             $progress_repo->upsertProgress($post_id, 'pending', 'none', '');
-            
+
             $result = $this->generator_service->generate( $post_id );
             wp_send_json_success( $result );
         } catch ( \Exception $e ) {
