@@ -10,4 +10,5 @@ interface ApiProviderInterface {
     public function getName(): string;
     public function getRateLimit(): int;
     public function isEnabled(): bool;
+    public function getQuota(): array;
 }

@@ -73,6 +73,9 @@ class SettingsController {
         if ( isset( $_POST['openrouter_model'] ) ) {
             update_option( 'sc_ai_openrouter_model', sanitize_text_field( $_POST['openrouter_model'] ) );
         }
+        if ( isset( $_POST['openrouter_max_tokens'] ) ) {
+            update_option( 'sc_ai_openrouter_max_tokens', intval( $_POST['openrouter_max_tokens'] ?? 500 ) );
+        }
 
         // Queue Settings
         update_option( 'sc_ai_final_batch_size', absint( $_POST['final_batch_size'] ?? 20 ) );

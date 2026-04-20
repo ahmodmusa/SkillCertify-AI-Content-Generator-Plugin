@@ -31,6 +31,7 @@ class AjaxController {
         add_action( 'wp_ajax_sc_ai_reset_stuck', [ $this, 'handleResetStuck' ] );
         add_action( 'wp_ajax_sc_ai_delete_question', [ $this, 'handleDeleteQuestion' ] );
         add_action( 'wp_ajax_sc_ai_manual_cron', [ $this, 'handleManualCron' ] );
+        add_action( 'wp_ajax_sc_ai_get_usage', [ $this, 'handleGetUsage' ] );
     }
 
     public function handleGenerate(): void {
@@ -221,6 +222,24 @@ class AjaxController {
         } catch ( \Exception $e ) {
             error_log( '[SC AI] Manual cron exception: ' . $e->getMessage() );
             wp_send_json_error( [ 'message' => 'An error occurred: ' . $e->getMessage() ] );
+        }
+    }
+
+    public function handleGetUsage(): void {
+        check_ajax_referer( 'sc_ai_nonce', 'nonce' );
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( [ 'message' => 'Permission denied' ] );
+        }
+
+        try {
+            $usage_tracker = $this->service_provider->get( 'usage.tracker' );
+            $api_pool = $this->service_provider->get( 'api.pool' );
+            $providers = $api_pool->getAvailableProviders();
+            $usage_data = $usage_tracker->getAllUsage( $providers );
+            wp_send_json_success( $usage_data );
+        } catch ( \Exception $e ) {
+            error_log( '[SC AI] Get usage exception: ' . $e->getMessage() );
+            wp_send_json_error( [ 'message' => 'Failed to get usage data' ] );
         }
     }
 }

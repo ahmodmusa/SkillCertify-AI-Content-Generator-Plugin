@@ -8,11 +8,13 @@ class GroqProvider implements ApiProviderInterface {
     private string $api_key;
     private string $model;
     private int $timeout;
+    private $usage_tracker;
 
-    public function __construct( string $api_key, string $model = 'llama-3.1-8b-instant' ) {
+    public function __construct( string $api_key, string $model = 'llama-3.1-8b-instant', $usage_tracker = null ) {
         $this->api_key = $api_key;
         $this->model = $model;
         $this->timeout = 30;
+        $this->usage_tracker = $usage_tracker;
     }
 
     public function generate( string $prompt ): string|false {
@@ -55,6 +57,11 @@ class GroqProvider implements ApiProviderInterface {
         $response_headers = wp_remote_retrieve_headers( $response );
 
         error_log( '[SC AI PERF] Groq API | Time: ' . $timestamp . ' | Code: ' . $code . ' | Duration: ' . $duration . 's' );
+
+        // Track usage
+        if ( $this->usage_tracker ) {
+            $this->usage_tracker->recordRequest( 'groq', $code );
+        }
 
         if ( $code === 429 ) {
             error_log( '[SC AI] Groq rate limit hit' );
@@ -102,5 +109,11 @@ class GroqProvider implements ApiProviderInterface {
 
     public function isEnabled(): bool {
         return ! empty( $this->api_key );
+    }
+
+    public function getQuota(): array {
+        // Groq doesn't have a public quota endpoint
+        // We'll return the local usage data as a fallback
+        return [ 'error' => 'No public quota endpoint available' ];
     }
 }

@@ -10,6 +10,7 @@ $config = [
     'groq_max_tokens' => get_option( 'sc_ai_groq_max_tokens', 4000 ),
     'groq_batch_model' => get_option( 'sc_ai_groq_batch_model', 'llama-3.1-8b-instant' ),
     'openrouter_model' => get_option( 'sc_ai_openrouter_model', 'openai/gpt-3.5-turbo' ),
+    'openrouter_max_tokens' => get_option( 'sc_ai_openrouter_max_tokens', 500 ),
     'final_batch_size' => get_option( 'sc_ai_final_batch_size', 20 ),
     'final_cron_time' => get_option( 'sc_ai_final_cron_time', '04:00' ),
     'enable_cron' => get_option( 'sc_ai_enable_cron', '1' ),
@@ -84,7 +85,7 @@ $config = [
             </td>
           </tr>
           <tr>
-            <th>Max Tokens (Single Generate)</th>
+            <th>Groq Max Tokens (Single Generate)</th>
             <td>
               <input type="number"
                 name="groq_max_tokens"
@@ -92,7 +93,7 @@ $config = [
                 min="1000" max="8000" step="500"
                 style="width:100px" />
               <p class="description">
-                Tokens for manual/single generation.
+                Tokens for Groq manual/single generation.
                 Higher = longer content but slower.
                 Recommended: 4000.
                 Free tier max: 6000.
@@ -121,9 +122,52 @@ $config = [
           <tr>
             <th>OpenRouter Model</th>
             <td>
-              <input type="text" name="openrouter_model" class="regular-text"
-                     value="<?= esc_attr( $config['openrouter_model'] ) ?>"
-                     placeholder="openai/gpt-3.5-turbo">
+              <select name="openrouter_model" class="regular-text">
+                <optgroup label="Free Models">
+                  <option value="google/gemma-4-31b-it:free"
+                    <?= selected( $config['openrouter_model'], 'google/gemma-4-31b-it:free' ); ?>>
+                    google/gemma-4-31b-it:free (Good quality, free)
+                  </option>
+                  <option value="meta-llama/llama-3-8b-instruct:free"
+                    <?= selected( $config['openrouter_model'], 'meta-llama/llama-3-8b-instruct:free' ); ?>>
+                    meta-llama/llama-3-8b-instruct:free (Fast, free)
+                  </option>
+                  <option value="microsoft/wizardlm-2-8x22b:free"
+                    <?= selected( $config['openrouter_model'], 'microsoft/wizardlm-2-8x22b:free' ); ?>>
+                    microsoft/wizardlm-2-8x22b:free (Good quality, free)
+                  </option>
+                </optgroup>
+                <optgroup label="Paid Models (with $5 credit)">
+                  <option value="llama-3.3-70b-versatile"
+                    <?= selected( $config['openrouter_model'], 'llama-3.3-70b-versatile' ); ?>>
+                    llama-3.3-70b-versatile (Excellent quality)
+                  </option>
+                  <option value="openai/gpt-3.5-turbo"
+                    <?= selected( $config['openrouter_model'], 'openai/gpt-3.5-turbo' ); ?>>
+                    openai/gpt-3.5-turbo (Fast, good quality)
+                  </option>
+                  <option value="openai/gpt-4o-mini"
+                    <?= selected( $config['openrouter_model'], 'openai/gpt-4o-mini' ); ?>>
+                    openai/gpt-4o-mini (Very fast, cost efficient)
+                  </option>
+                </optgroup>
+                <optgroup label="Custom">
+                  <option value="openai/gpt-3.5-turbo"
+                    <?= selected( $config['openrouter_model'], 'openai/gpt-3.5-turbo' ); ?>>
+                    Default: openai/gpt-3.5-turbo
+                  </option>
+                </optgroup>
+              </select>
+              <p class="description">Choose a model. Free models require no credits but may have limits.</p>
+            </td>
+          </tr>
+          <tr>
+            <th>OpenRouter Max Tokens</th>
+            <td>
+              <input type="number" name="openrouter_max_tokens" class="regular-text"
+                     value="<?= esc_attr( $config['openrouter_max_tokens'] ) ?>"
+                     min="250" max="8000" step="50">
+              <p class="description">Free models may have limits (e.g., 299 tokens). Set to 250-500 for free models.</p>
             </td>
           </tr>
         </table>
@@ -213,11 +257,15 @@ $config = [
         <button id="sc-test-api" class="button button-secondary" style="font-size:13px">
           🔧 Test API Connection
         </button>
+        <button id="sc-refresh-usage" class="button button-secondary" style="font-size:13px;margin-left:10px">
+          📊 Refresh Usage
+        </button>
         <button id="sc-reset-stuck" class="button button-secondary" style="font-size:13px;margin-left:10px">
           🔄 Reset Stuck
         </button>
       </div>
       <div id="sc-api-test-result" style="margin-top:12px;padding:12px;background:#F0F9FF;border-radius:4px;display:none;font-size:13px"></div>
+      <div id="sc-usage-data" style="margin-top:12px;padding:12px;background:#F9F9F9;border-radius:4px;font-size:13px"></div>
     </div>
 
     <!-- CRON JOB HISTORY -->

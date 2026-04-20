@@ -48,7 +48,8 @@ class ServiceProvider {
             $config = $this->get( 'config' );
             return new \SC_AI\ContentGenerator\Services\API\GroqProvider(
                 $config['groq_key'],
-                $config['groq_model']
+                $config['groq_model'],
+                $this->get( 'usage.tracker' )
             );
         });
 
@@ -56,7 +57,9 @@ class ServiceProvider {
             $config = $this->get( 'config' );
             return new \SC_AI\ContentGenerator\Services\API\OpenRouterProvider(
                 $config['openrouter_key'],
-                $config['openrouter_model']
+                $config['openrouter_model'],
+                $config['openrouter_max_tokens'],
+                $this->get( 'usage.tracker' )
             );
         });
 
@@ -65,6 +68,10 @@ class ServiceProvider {
                 SC_AI_CIRCUIT_FAILURE_THRESHOLD,
                 SC_AI_CIRCUIT_TIMEOUT
             );
+        });
+
+        $this->singleton( 'usage.tracker', function() {
+            return new \SC_AI\ContentGenerator\Services\UsageTracker();
         });
 
         $this->singleton( 'api.pool', function() {

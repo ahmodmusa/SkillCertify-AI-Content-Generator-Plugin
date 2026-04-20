@@ -16,6 +16,7 @@ return [
     'groq_max_tokens' => 4000,
     'groq_batch_model' => 'llama-3.1-8b-instant',
     'openrouter_model' => 'openai/gpt-3.5-turbo',
+    'openrouter_max_tokens' => 500,
     
     // Queue Settings
     'final_batch_size' => 20,
