@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SC AI Content Generator
  * Description: Generates SEO content for questions using free AI APIs (Groq, OpenRouter)
- * Version:     1.0.7
+ * Version:     1.0.9
  * Requires PHP: 7.4
  * Requires at least: 5.0
  */

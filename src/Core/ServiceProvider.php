@@ -206,7 +206,8 @@ class ServiceProvider {
 
         $this->singleton( 'controller.question_column', function() {
             return new \SC_AI\ContentGenerator\Controllers\QuestionColumnController(
-                $this->get( 'repository.progress' )
+                $this->get( 'repository.progress' ),
+                $this->get( 'generator.service' )
             );
         });
     }

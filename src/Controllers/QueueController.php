@@ -28,7 +28,7 @@ class QueueController {
 
         $batch_size = absint( get_option( 'sc_ai_final_batch_size', 20 ) );
         $final_queue = $this->container->get( 'queue.final' );
-        $results = $final_queue->process( $batch_size );
+        $results = $final_queue->process( $batch_size, [], false );
 
         error_log( sprintf(
             '[SC AI] Final cron: %d processed, %d success, %d failed',

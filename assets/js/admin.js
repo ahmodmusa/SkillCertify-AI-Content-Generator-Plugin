@@ -71,7 +71,6 @@
             }
 
             html += '<tr>';
-            html += '<td style="padding: 8px; border-bottom: 1px solid #e5e5e5;"><input type="checkbox" class="sc-ai-item-checkbox" data-id="' + q.id + '"></td>';
             html += '<td style="padding: 8px; border-bottom: 1px solid #e5e5e5; min-width: 500px;"><a href="' + q.edit_link + '" style="color: #2271b1; text-decoration: none;">' + q.title + '</a></td>';
             html += '<td style="padding: 8px; border-bottom: 1px solid #e5e5e5; width: 80px;">' + statusBadge + '</td>';
             html += '<td style="padding: 8px; border-bottom: 1px solid #e5e5e5; font-size: 12px; color: #646970; width: 110px;">' + (q.generated_time || '—') + '</td>';
@@ -102,10 +101,6 @@
             btn.addEventListener('click', function() {
                 scAiDeleteQuestion(this.dataset.id);
             });
-        });
-
-        document.querySelectorAll('.sc-ai-item-checkbox').forEach(cb => {
-            cb.addEventListener('change', scAiUpdateBatchButton);
         });
     }
 
@@ -185,51 +180,6 @@
         });
     }
 
-    /**
-     * Update batch button
-     */
-    function scAiUpdateBatchButton() {
-        const selected = document.querySelectorAll('.sc-ai-item-checkbox:checked').length;
-        const btn = document.getElementById('sc-ai-batch-generate');
-        if (selected > 0) {
-            btn.style.display = 'inline-block';
-            btn.textContent = 'Generate Selected (' + selected + ')';
-        } else {
-            btn.style.display = 'none';
-        }
-    }
-
-    /**
-     * Batch generate
-     */
-    function scAiBatchGenerate(questionIds) {
-        scAiShowModal({
-            title: 'Batch Generate Content',
-            message: 'Generate AI content for ' + questionIds.length + ' selected questions?',
-            confirmText: 'Generate All',
-            onConfirm: () => {
-                fetch(scAiAjaxUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({
-                        action: 'sc_ai_final_batch_manual',
-                        nonce: scAiNonce,
-                        batch: questionIds.length,
-                    }),
-                })
-                .then(r => r.json())
-                .then(response => {
-                    if (response.success) {
-                        scAiShowToast('Batch generation started for ' + questionIds.length + ' questions', 'success');
-                        setTimeout(() => scAiLoadTable(scAiCurrentPage, scAiCurrentFilter), 3000);
-                    } else {
-                        scAiShowToast('Error: ' + (response.data || 'Unknown error'), 'error');
-                    }
-                })
-                .catch(err => scAiShowToast('Error: ' + err.message, 'error'));
-            }
-        });
-    }
 
     /**
      * Show custom modal dialog
@@ -386,24 +336,6 @@
                 this.classList.add('button-primary');
                 scAiLoadTable(1, this.dataset.filter);
             });
-        });
-
-        // Select all checkbox
-        document.getElementById('sc-ai-select-all')?.addEventListener('change', function() {
-            const checkboxes = document.querySelectorAll('.sc-ai-item-checkbox');
-            checkboxes.forEach(cb => cb.checked = this.checked);
-            scAiUpdateBatchButton();
-        });
-
-        // Batch generate button
-        document.getElementById('sc-ai-batch-generate')?.addEventListener('click', function() {
-            const selected = Array.from(document.querySelectorAll('.sc-ai-item-checkbox:checked')).map(cb => parseInt(cb.dataset.id));
-            if (selected.length === 0) return;
-            if (selected.length > 20) {
-                scAiShowToast('Maximum 20 items allowed for batch generation', 'error');
-                return;
-            }
-            scAiBatchGenerate(selected);
         });
 
         // Load table on page load

@@ -124,47 +124,34 @@ document.addEventListener('DOMContentLoaded', function() {
         cronBtn.addEventListener('click', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            const result = document.getElementById('sc-api-test-result');
-            if (!result) {
-                alert('Result element not found');
-                return;
-            }
-            result.style.display = 'block';
-            result.style.background = '#FFF3CD';
-            result.innerHTML = '<strong>Running final cron job...</strong>';
 
-            fetch(ajaxurl, {
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Running...';
+
+            fetch(scAiAjaxUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: new URLSearchParams({
-                    action: 'sc_ai_manual_cron',
-                    nonce: scAiSettings.nonce,
+                    action: 'sc_ai_final_batch_manual',
+                    nonce: scAiNonce
                 }),
             })
-            .then( response => {
-                if (!response.ok) {
-                    throw new Error('HTTP ' + response.status + ': ' + response.statusText);
-                }
-                return response.json();
-            })
-            .then( data => {
-                if ( data.success ) {
-                    result.style.background = '#D4EDDA';
-                    let msg = '<strong>Cron Job Complete!</strong><br>';
-                    msg += '✅ Processed: ' + data.data.processed + '<br>';
-                    msg += '✅ Success: ' + data.data.success + '<br>';
-                    if ( data.data.failed > 0 ) {
-                        msg += '❌ Failed: ' + data.data.failed;
-                    }
-                    result.innerHTML = msg;
+            .then(r => r.json())
+            .then(response => {
+                if (response.success) {
+                    alert('Batch completed: ' + response.data.processed + ' processed, ' + response.data.success + ' successful, ' + response.data.failed + ' failed');
+                    loadUsageData(); // Refresh usage after batch
                 } else {
-                    result.style.background = '#F8D7DA';
-                    result.innerHTML = '<strong>Error:</strong> ' + (data.data || 'Unknown error');
+                    alert('Error: ' + response.data.message);
                 }
             })
-            .catch( err => {
-                result.style.background = '#F8D7DA';
-                result.innerHTML = '<strong>Error:</strong> ' + err.message + '<br><small>Check browser console for details (F12)</small>';
+            .catch(err => {
+                alert('Error: ' + err.message);
+            })
+            .finally(() => {
+                btn.disabled = false;
+                btn.textContent = '⏰ Run Batch (' + document.querySelector('[name="manual_batch_size"]').value + ' questions)';
             });
         });
     }

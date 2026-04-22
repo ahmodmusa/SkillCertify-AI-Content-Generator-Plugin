@@ -6,10 +6,12 @@ defined( 'ABSPATH' ) || exit;
 
 class QuestionColumnController {
     private object $progress_repository;
+    private object $generator_service;
     private array $status_cache = [];
 
-    public function __construct( object $progress_repository ) {
+    public function __construct( object $progress_repository, object $generator_service ) {
         $this->progress_repository = $progress_repository;
+        $this->generator_service = $generator_service;
     }
 
     /**
@@ -20,6 +22,9 @@ class QuestionColumnController {
         add_filter( 'the_posts', [ $this, 'prefetchStatus' ], 10, 2 );
         add_action( 'manage_scp_question_posts_custom_column', [ $this, 'renderColumn' ], 10, 2 );
         add_action( 'admin_enqueue_scripts', [ $this, 'enqueueAssets' ] );
+        add_filter( 'bulk_actions-edit-scp_question', [ $this, 'addBulkAction' ] );
+        add_filter( 'handle_bulk_actions-edit-scp_question', [ $this, 'handleBulkAction' ], 10, 3 );
+        add_action( 'admin_notices', [ $this, 'showBulkActionNotice' ] );
     }
 
     /**
@@ -169,6 +174,81 @@ class QuestionColumnController {
                 .sc-ai-time { display:block; color:#999; font-size:11px; }
                 .column-sc_ai_status { width:160px; }
             ' );
+        }
+    }
+
+    /**
+     * Add bulk action to Actions dropdown
+     */
+    public function addBulkAction( array $bulk_actions ): array {
+        $bulk_actions['sc_ai_generate'] = 'Generate AI Content';
+        return $bulk_actions;
+    }
+
+    /**
+     * Handle bulk action
+     */
+    public function handleBulkAction( string $redirect_to, string $doaction, array $post_ids ): string {
+        if ( $doaction !== 'sc_ai_generate' ) {
+            return $redirect_to;
+        }
+
+        $processed = 0;
+        $success = 0;
+        $failed = 0;
+        $skipped = 0;
+
+        foreach ( $post_ids as $post_id ) {
+            $processed++;
+            error_log( "[SC AI Bulk] Processing post #{$post_id}" );
+            $result = $this->generator_service->generate( $post_id );
+            if ( $result['success'] ) {
+                $success++;
+                error_log( "[SC AI Bulk] Success for post #{$post_id}" );
+            } else {
+                // Check if error is "Content already exists" - skip instead of fail
+                if ( isset( $result['error'] ) && strpos( $result['error'], 'Content already exists' ) !== false ) {
+                    $skipped++;
+                    error_log( "[SC AI Bulk] Skipped post #{$post_id}: Content already exists" );
+                } else {
+                    $failed++;
+                    error_log( "[SC AI Bulk] Failed for post #{$post_id}: " . ( $result['error'] ?? 'Unknown error' ) );
+                }
+            }
+        }
+
+        $redirect_to = add_query_arg( [
+            'sc_ai_bulk_processed' => $processed,
+            'sc_ai_bulk_success' => $success,
+            'sc_ai_bulk_failed' => $failed,
+            'sc_ai_bulk_skipped' => $skipped,
+        ], $redirect_to );
+
+        return $redirect_to;
+    }
+
+    /**
+     * Show admin notice after bulk action
+     */
+    public function showBulkActionNotice(): void {
+        if ( isset( $_GET['sc_ai_bulk_processed'] ) ) {
+            $processed = intval( $_GET['sc_ai_bulk_processed'] );
+            $success = intval( $_GET['sc_ai_bulk_success'] );
+            $failed = intval( $_GET['sc_ai_bulk_failed'] );
+            $skipped = isset( $_GET['sc_ai_bulk_skipped'] ) ? intval( $_GET['sc_ai_bulk_skipped'] ) : 0;
+
+            $message = 'Processed ' . $processed . ' questions - ' . $success . ' successful';
+            if ( $failed > 0 ) {
+                $message .= ', ' . $failed . ' failed';
+            }
+            if ( $skipped > 0 ) {
+                $message .= ', ' . $skipped . ' skipped (content already exists)';
+            }
+            $message .= '.';
+
+            echo '<div class="notice notice-info is-dismissible">';
+            echo '<p><strong>AI Content Generation:</strong> ' . $message . '</p>';
+            echo '</div>';
         }
     }
 }

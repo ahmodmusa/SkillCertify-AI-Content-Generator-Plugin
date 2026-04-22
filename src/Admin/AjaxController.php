@@ -86,7 +86,8 @@ class AjaxController {
         }
 
         try {
-            $result = $this->generator_service->processFinalBatch( $batch );
+            // Force regenerate when manually triggering batch generation
+            $result = $this->generator_service->processFinalBatch( $batch, true );
             
             // Log to manual history
             if ( isset( $result['generated'] ) && is_array( $result['generated'] ) ) {
@@ -209,16 +210,22 @@ class AjaxController {
         }
 
         try {
+            // Get specific question IDs if provided (bulk selection)
+            $specific_ids = isset( $_POST['question_ids'] ) ? array_map( 'intval', $_POST['question_ids'] ) : [];
+
             // Use manual batch size for manual runs (safer to avoid rate limits)
             $batch_size = absint( get_option( 'sc_ai_manual_batch_size', 5 ) );
             $final_queue = $this->service_provider->get( 'queue.final' );
-            $results = $final_queue->process( $batch_size );
+            // Force regenerate when manually triggering bulk generation
+            $results = $final_queue->process( $batch_size, $specific_ids, true );
 
             wp_send_json_success( [
                 'processed' => $results['processed'],
                 'success' => $results['success'],
                 'failed' => $results['failed'],
+                'skipped' => $results['skipped'] ?? 0,
                 'batch_size' => $batch_size,
+                'generated' => $results['generated'] ?? [],
             ] );
         } catch ( \Exception $e ) {
             error_log( '[SC AI] Manual cron exception: ' . $e->getMessage() );

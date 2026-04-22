@@ -2,6 +2,19 @@
 
 All notable changes to the SC AI Content Generator plugin will be documented in this file.
 
+## [1.0.9] - 2026-04-22
+
+### 🔧 Code Improvements
+- Updated admin settings and dashboard JavaScript for better UX
+- Improved queue controller and final queue processing
+- Enhanced generator service for more reliable content generation
+- Updated question column controller for better integration
+- Improved service provider initialization
+
+### 🐛 Bug Fixes
+- Fixed AJAX controller issues for smoother admin interactions
+- Fixed dashboard view rendering
+
 ## [1.0.4] - 2026-04-20
 
 ### 🆕 New Features

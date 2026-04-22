@@ -117,8 +117,6 @@ defined( 'ABSPATH' ) || exit;
             <button class="sc-ai-filter button button-primary" data-filter="all">All</button>
             <button class="sc-ai-filter button" data-filter="pending">Pending</button>
             <button class="sc-ai-filter button" data-filter="complete">Complete</button>
-            <span style="margin-left: auto; color: #646970; font-size: 13px;">Select up to 20 items for batch generation</span>
-            <button class="button button-primary" id="sc-ai-batch-generate" style="display: none;">Generate Selected (0)</button>
         </div>
 
         <!-- Table -->
@@ -126,7 +124,6 @@ defined( 'ABSPATH' ) || exit;
             <table class="sc-ai-status-table wp-list-table widefat fixed striped" style="width: 100%; border-collapse: collapse;">
                 <thead>
                     <tr>
-                        <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e5e5e5; width: 40px;"><input type="checkbox" id="sc-ai-select-all"></th>
                         <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e5e5e5; min-width: 500px;">Question Title</th>
                         <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e5e5e5; width: 80px;">Status</th>
                         <th style="padding: 8px; text-align: left; border-bottom: 1px solid #e5e5e5; width: 110px;">Generated Time</th>

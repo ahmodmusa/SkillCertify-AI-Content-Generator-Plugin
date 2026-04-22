@@ -27,8 +27,8 @@ class GeneratorService {
         return $this->final_queue->enqueueBatch( $question_ids );
     }
 
-    public function processFinalBatch( int $batch_size ): array {
-        return $this->final_queue->process( $batch_size );
+    public function processFinalBatch( int $batch_size, bool $force_regenerate = false ): array {
+        return $this->final_queue->process( $batch_size, [], $force_regenerate );
     }
 
     public function processRetryBatch(): array {
